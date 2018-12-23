@@ -10,10 +10,32 @@ use std::io::Cursor;
 use byteorder::{LittleEndian, ReadBytesExt};
 
 pub enum ParseError {
-    Previous,
-    MerkleRoot,
-    PreviousTransactionHash,
-    SignatureContent
+    
+    BlockVersion,
+    BlockPrevious,
+    BlockMerkleRoot,
+    BlockTime,
+    BlockNonce,
+    BlockBits,
+
+    TransactionsCount,
+    TransactionVersion,
+    TransactionLockTime,
+
+    ScriptContent,
+    ScriptLen,
+    SignatureScriptContent,
+    SignatureScriptLen,
+    ScriptPubKeyScriptContent,
+    ScriptPubKeyScriptLen,
+
+    OutputsCount,
+    TxOutAmount,
+
+    InputsCount,
+    TxInTransactionHash,
+    TxInSequence,
+    TxInIndex,
 }
 
 pub fn parse(hex: &Vec<u8>) -> Result<Block, ParseError> {
@@ -25,19 +47,19 @@ pub fn parse(hex: &Vec<u8>) -> Result<Block, ParseError> {
 
 fn parse_block(r: &mut Cursor<&Vec<u8>>) -> Result<Block, ParseError> {
 
-    let version = r.read_u32::<LittleEndian>().unwrap();
+    let version = r.read_u32::<LittleEndian>().map_err(|_| ParseError::BlockVersion)?;
 
     let mut previous = [0; 32];
-    r.read_exact(&mut previous).map_err(|_| ParseError::Previous)?;
+    r.read_exact(&mut previous).map_err(|_| ParseError::BlockPrevious)?;
 
     let mut merkleroot = [0; 32];
-    r.read_exact(&mut merkleroot).map_err(|_| ParseError::MerkleRoot)?;
+    r.read_exact(&mut merkleroot).map_err(|_| ParseError::BlockMerkleRoot)?;
 
-    let time = r.read_u32::<LittleEndian>().unwrap();
-    let bits = r.read_u32::<LittleEndian>().unwrap();
-    let nonce = r.read_u32::<LittleEndian>().unwrap();
+    let time = r.read_u32::<LittleEndian>().map_err(|_| ParseError::BlockTime)?;
+    let bits = r.read_u32::<LittleEndian>().map_err(|_| ParseError::BlockBits)?;
+    let nonce = r.read_u32::<LittleEndian>().map_err(|_| ParseError::BlockNonce)?;
 
-    let transactions = parse_transactions(r).ok().unwrap();
+    let transactions = parse_transactions(r)?;
 
     let result = Block {
         version: version,
@@ -55,9 +77,9 @@ fn parse_block(r: &mut Cursor<&Vec<u8>>) -> Result<Block, ParseError> {
 fn parse_transactions(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Transaction>, ParseError> {
 
     let mut result : Vec<Transaction> = Vec::new();
-    let count = r.read_u8().unwrap();
+    let count = r.read_u8().map_err(|_| ParseError::TransactionsCount)?;
     for _ in 0..count {
-        let transaction = parse_transaction(r).ok().unwrap();
+        let transaction = parse_transaction(r)?;
         result.push(transaction);
     }
     
@@ -66,14 +88,16 @@ fn parse_transactions(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Transaction>, Pars
 
 fn parse_transaction(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, ParseError> {
 
-    let version = r.read_i32::<LittleEndian>().unwrap();
-    let inputs = parse_inputs(r).ok().unwrap();
-    let outputs = parse_outputs(r).ok().unwrap();
+    let version = r.read_i32::<LittleEndian>().map_err(|_| ParseError::TransactionVersion)?;
+    let inputs = parse_inputs(r)?;
+    let outputs = parse_outputs(r)?;
+    let locktime = r.read_u32::<LittleEndian>().map_err(|_| ParseError::TransactionLockTime)?;
+
     let result = Transaction {
         inputs: inputs,
         outputs: outputs,
         version: version,
-        locktime: 0
+        locktime: locktime
     };
     
     Ok(result)
@@ -82,9 +106,9 @@ fn parse_transaction(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, ParseError
 fn parse_inputs(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxIn>, ParseError> {
 
     let mut result : Vec<TxIn> = Vec::new();
-    let count = r.read_u8().unwrap();
+    let count = r.read_u8().map_err(|_| ParseError::InputsCount)?;
     for _ in 0..count {
-        let input = parse_input(r).ok().unwrap();
+        let input = parse_input(r)?;
         result.push(input);
     }
 
@@ -94,15 +118,22 @@ fn parse_inputs(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxIn>, ParseError> {
 fn parse_input(r: &mut Cursor<&Vec<u8>>) -> Result<TxIn, ParseError> {
 
     let mut transaction_hash = [0; 32];
-    r.read_exact(&mut transaction_hash).map_err(|_| ParseError::PreviousTransactionHash)?;
-    let index = r.read_u32::<LittleEndian>().unwrap();
+    r.read_exact(&mut transaction_hash).map_err(|_| ParseError::TxInTransactionHash)?;
+    let index = r.read_u32::<LittleEndian>().map_err(|_| ParseError::TxInIndex)?;
     let previous = OutPoint {
         transaction_hash: transaction_hash,
         index: index,
     };
 
-    let signature = parse_script(r).ok().unwrap();
-    let sequence = r.read_u32::<LittleEndian>().unwrap();
+    let signature = parse_script(r)
+        .map_err(|e| {
+            match e {
+                ParseError::ScriptContent => ParseError::SignatureScriptContent,
+                ParseError::ScriptLen => ParseError::SignatureScriptLen,
+                _ => e
+            }
+        })?;
+    let sequence = r.read_u32::<LittleEndian>().map_err(|_| ParseError::TxInSequence)?;
     let witness = Vec::new();
 
     let result = TxIn {
@@ -118,9 +149,9 @@ fn parse_input(r: &mut Cursor<&Vec<u8>>) -> Result<TxIn, ParseError> {
 fn parse_outputs(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxOut>, ParseError> {
 
     let mut result : Vec<TxOut> = Vec::new();
-    let count = r.read_u8().unwrap();
+    let count = r.read_u8().map_err(|_| ParseError::OutputsCount)?;
     for _ in 0..count {
-        let output = parse_output(r).ok().unwrap();
+        let output = parse_output(r)?;
         result.push(output);
     }
 
@@ -129,8 +160,15 @@ fn parse_outputs(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxOut>, ParseError> {
 
 fn parse_output(r: &mut Cursor<&Vec<u8>>) -> Result<TxOut, ParseError> {
 
-    let amount = r.read_u64::<LittleEndian>().unwrap();
-    let script_pubkey = parse_script(r).ok().unwrap();
+    let amount = r.read_u64::<LittleEndian>().map_err(|_| ParseError::TxOutAmount)?;
+    let script_pubkey = parse_script(r)
+        .map_err(|e| {
+            match e {
+                ParseError::ScriptContent => ParseError::ScriptPubKeyScriptContent,
+                ParseError::ScriptLen => ParseError::ScriptPubKeyScriptLen,
+                _ => e
+            }
+        })?;
 
     let result = TxOut {
         amount: amount,
@@ -142,10 +180,10 @@ fn parse_output(r: &mut Cursor<&Vec<u8>>) -> Result<TxOut, ParseError> {
 
 fn parse_script(r: &mut Cursor<&Vec<u8>>) -> Result<Script, ParseError> {
 
-    let scriptlen = r.read_u8().unwrap();
+    let scriptlen = r.read_u8().map_err(|_| ParseError::ScriptLen)?;
     let mut content = vec![0u8; scriptlen as usize];
     let mut content_ref = content.as_mut_slice();
-    r.read_exact(&mut content_ref).map_err(|_| ParseError::SignatureContent)?;
+    r.read_exact(&mut content_ref).map_err(|_| ParseError::ScriptContent)?;
 
     let result = Script {
         content: content
