@@ -1,2 +1,4 @@
+#[cfg(test)]
 mod basic_test;
-mod genesis_test;
+mod hexdump_test;
+mod block_test;

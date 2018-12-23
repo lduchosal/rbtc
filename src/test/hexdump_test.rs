@@ -1,6 +1,5 @@
-#[cfg(test)]
 #[test]
-fn when_genesis_block_then_version_00001() {
+fn when_genesis_block_then_len_285() {
     let genesis = "
 00000000   01 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00   ................
 00000010   00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00   ................

@@ -1,0 +1,24 @@
+digraph G {
+    splines="FALSE";
+
+    /* Entities */
+    Block
+    Transaction
+    TxIn
+    TxOut
+    OutPoint
+
+    /* Relations */
+    Block 
+    -> Transaction
+
+    Transaction
+    -> TxIn
+
+    Transaction
+    -> TxOut
+
+    TxIn
+    -> OutPoint
+
+} 

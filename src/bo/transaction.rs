@@ -10,8 +10,8 @@ use crate::bo::txin::TxIn;
 
 #[derive(Debug)]
 pub struct Transaction {
-    inputs: Vec<TxIn>,
-    outputs: Vec<TxOut>,
-    version: i32,
-    locktime: u32
+    pub inputs: Vec<TxIn>,
+    pub outputs: Vec<TxOut>,
+    pub version: i32,
+    pub locktime: u32
 }

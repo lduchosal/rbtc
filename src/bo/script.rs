@@ -1,2 +1,4 @@
 #[derive(Debug)]
-pub struct Script(Vec<u8>);
+pub struct Script {
+    pub content: Vec<u8>
+}

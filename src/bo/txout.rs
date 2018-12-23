@@ -5,6 +5,6 @@ use crate::bo::script::Script;
 
 #[derive(Debug)]
 pub struct TxOut {
-    value: u64,
-    script: Script // scriptPubKey
+    pub value: u64,
+    pub script_pubkey: Script // scriptPubKey
 } 

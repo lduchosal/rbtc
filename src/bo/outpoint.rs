@@ -9,6 +9,6 @@
 
 #[derive(Debug)]
 pub struct OutPoint {
-    hash: [u8; 32],
-    index: u32,
+    pub transaction_hash: [u8; 32],
+    pub index: u32,
 }

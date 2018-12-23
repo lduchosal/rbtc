@@ -16,8 +16,8 @@ use crate::bo::outpoint::OutPoint;
 
 #[derive(Debug)]
 pub struct TxIn {
-    prevout: OutPoint,
-    signature: Script, // scriptSig
-    sequence: u32,
-    witness: Vec<Vec<u8>>
+    pub previous: OutPoint,
+    pub signature: Script, // scriptSig
+    pub sequence: u32,
+    pub witness: Vec<Vec<u8>>
 } 

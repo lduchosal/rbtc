@@ -1,6 +1,6 @@
-mod block;
-mod transaction;
-mod txin;
-mod txout;
-mod outpoint;
-mod script;
+pub mod block;
+pub mod transaction;
+pub mod txin;
+pub mod txout;
+pub mod outpoint;
+pub mod script;
