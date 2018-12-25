@@ -9,8 +9,12 @@ use std::io::Read;
 use std::io::Cursor;
 use byteorder::{LittleEndian, ReadBytesExt};
 
+#[derive(PartialEq, Debug)]
 pub enum ParseError {
     
+    InvalidLength,
+    RemainingContent,
+
     BlockVersion,
     BlockPrevious,
     BlockMerkleRoot,
@@ -40,8 +44,15 @@ pub enum ParseError {
 
 pub fn parse(hex: &Vec<u8>) -> Result<Block, ParseError> {
 
+    if hex.len() < 81 { // might not be true
+        return Err(ParseError::InvalidLength);
+    }
     let mut r = Cursor::new(hex);
     let result = parse_block(&mut r)?;
+
+    if r.position() as usize != hex.len() {
+        return Err(ParseError::RemainingContent);
+    }
     Ok(result)
 }
 

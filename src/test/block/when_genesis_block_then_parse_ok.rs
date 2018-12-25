@@ -7,9 +7,8 @@ use crate::bo::txout::TxOut;
 use crate::business::block;
 use crate::hexdump;
 
-#[cfg(test)]
 #[test]
-fn when_genesis_block_then_version1() {
+fn test() {
     let dump = "
 00000000   01 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00   ................
 00000010   00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00   ................
@@ -36,9 +35,10 @@ fn when_genesis_block_then_version1() {
 
     assert_eq!(hex.len(), 285);
 
-    let b : Block = block::parse(&hex)
-        .ok()
-        .unwrap();
+    let result = block::parse(&hex);
+    assert!(result.is_ok());
+
+    let b = result.ok().unwrap();
 
     assert_eq!(b.version, 0x00000001, "b.version");
     assert_eq!(b.previous, [0; 32], "b.previous");
@@ -86,6 +86,7 @@ fn when_genesis_block_then_version1() {
 
     let o : &TxOut = t.outputs.get(0).unwrap();
 
+    assert_eq!(o.amount, 5000000000, "o.amount"); // 50BTC
     assert_eq!(o.script_pubkey.content.len(), 0x43, "o.script_pubkey.content.len");
     assert_eq!(o.script_pubkey.content, vec![
         0x41, 0x04, 0x67, 0x8A, 0xFD, 0xB0, 0xFE, 0x55,
@@ -98,6 +99,6 @@ fn when_genesis_block_then_version1() {
         0x8D, 0x57, 0x8A, 0x4C, 0x70, 0x2B, 0x6B, 0xF1, 
         0x1D, 0x5F, 0xAC
     ], "o.script_pubkey.content");
-    assert_eq!(o.amount, 5000000000, "0.amount"); // 50BTC
+
 
 }

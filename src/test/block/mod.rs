@@ -1,0 +1,5 @@
+mod when_invalid_block_then_parse_fail;
+mod when_genesis_block_then_parse_ok;
+mod when_null_block_then_parse_ok;
+mod when_invalid_data_then_block_parse_fail_with_invalidlength;
+mod when_some_block_then_parse_ok;
