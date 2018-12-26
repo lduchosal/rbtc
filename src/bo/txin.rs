@@ -19,5 +19,4 @@ pub struct TxIn {
     pub previous: OutPoint,
     pub signature: Script, // scriptSig
     pub sequence: u32,
-    pub witness: Vec<Vec<u8>>
 } 

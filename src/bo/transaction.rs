@@ -7,11 +7,14 @@
 // {
 use crate::bo::txout::TxOut;
 use crate::bo::txin::TxIn;
+use crate::bo::witness::Witness;
 
 #[derive(Debug)]
 pub struct Transaction {
+    pub version: i32,
+    pub flag: Option<u16>,
     pub inputs: Vec<TxIn>,
     pub outputs: Vec<TxOut>,
-    pub version: i32,
+    pub witness: Option<Vec<Witness>>,
     pub locktime: u32
 }

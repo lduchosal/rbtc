@@ -77,7 +77,6 @@ fn test() {
         0x62, 0x61, 0x6E, 0x6B ,0x73
     ], "i.signature.content");
 
-    assert_eq!(i.witness.len(), 0, "i.witness.len");
 
     let p : &OutPoint = &i.previous;
 
@@ -99,6 +98,8 @@ fn test() {
         0x8D, 0x57, 0x8A, 0x4C, 0x70, 0x2B, 0x6B, 0xF1, 
         0x1D, 0x5F, 0xAC
     ], "o.script_pubkey.content");
+
+    assert!(t.witness.is_none(), "t.witness");
 
 
 }

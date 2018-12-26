@@ -4,3 +4,4 @@ pub mod txin;
 pub mod txout;
 pub mod outpoint;
 pub mod script;
+pub mod witness;

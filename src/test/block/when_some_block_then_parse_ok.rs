@@ -110,7 +110,7 @@ fn test() {
         "t1i.signature.content"
     );
 
-    assert_eq!(t1i.witness.len(), 0, "t1i.witness.len");
+    assert!(t1.witness.is_none(), "t1.witness");
 
     let t1ip: &OutPoint = &t1i.previous;
 
@@ -158,7 +158,7 @@ fn test() {
         ], "t2i1.signature.content"
     );
 
-    assert_eq!(t2i1.witness.len(), 0, "t2i1.witness.len");
+    assert!(t2.witness.is_none(), "t2.witness");
 
     let t2i1p: &OutPoint = &t2i1.previous;
 
@@ -182,9 +182,6 @@ fn test() {
         ], "t2i2.signature.content"
     );
 
-
-    assert_eq!(t2i2.witness.len(), 0, "t2i2.witness.len");
-
     let t2i2p: &OutPoint = &t2i2.previous;
 
     assert_eq!(t2i2p.transaction_hash, [
@@ -205,9 +202,6 @@ fn test() {
         0x0c, 0xe4, 0xd3, 0x38, 0x12, 0xa5, 0xce, 0x01
         ], "t2i3.signature.content"
     );
-
-
-    assert_eq!(t2i3.witness.len(), 0, "t2i3.witness.len");
 
     let t2i3p: &OutPoint = &t2i3.previous;
 
