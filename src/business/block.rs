@@ -30,8 +30,10 @@ pub enum ParseError {
 
     ScriptContent,
     ScriptLen,
+    
     SignatureScriptContent,
     SignatureScriptLen,
+
     ScriptPubKeyScriptContent,
     ScriptPubKeyScriptLen,
 
@@ -197,7 +199,7 @@ fn parse_transaction(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, ParseError
 fn parse_witnesses(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Witness>, ParseError> {
 
     let mut result : Vec<Witness> = Vec::new();
-    let count = r.read_u8().map_err(|_| ParseError::WitnessesCount)? as usize;
+    let count = parse_varint(r).map_err(|_| ParseError::WitnessesCount)?;
     for _ in 0..count {
         let witness = parse_witness(r)?;
         result.push(witness);
