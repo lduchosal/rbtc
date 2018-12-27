@@ -1,6 +1,6 @@
 
 use crate::business::block;
-use crate::business::block::ParseError;
+use crate::business::error::ParseError;
 use crate::hexdump;
 
 #[test]

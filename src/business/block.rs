@@ -1,3 +1,5 @@
+use crate::business::varint;
+use crate::business::error::ParseError;
 use crate::bo::witness::Witness;
 use crate::bo::txout::TxOut;
 use crate::bo::script::Script;
@@ -9,50 +11,6 @@ use crate::bo::transaction::Transaction;
 use std::io::Read;
 use std::io::Cursor;
 use byteorder::{LittleEndian, ReadBytesExt};
-
-#[derive(PartialEq, Debug)]
-pub enum ParseError {
-    
-    InvalidLength,
-    RemainingContent,
-
-    BlockVersion,
-    BlockPrevious,
-    BlockMerkleRoot,
-    BlockTime,
-    BlockNonce,
-    BlockBits,
-
-    TransactionsCount,
-    TransactionFlag,
-    TransactionVersion,
-    TransactionLockTime,
-
-    ScriptContent,
-    ScriptLen,
-    
-    SignatureScriptContent,
-    SignatureScriptLen,
-
-    ScriptPubKeyScriptContent,
-    ScriptPubKeyScriptLen,
-
-    OutputsCount,
-    TxOutAmount,
-
-    InputsCount,
-    TxInTransactionHash,
-    TxInSequence,
-    TxInIndex,
-
-    WitnessesCount,
-    WitnessLen,
-    WitnessData,
-
-    VarInt,
-    VarInt2,
-
-}
 
 pub fn parse(hex: &Vec<u8>) -> Result<Block, ParseError> {
 
@@ -119,7 +77,7 @@ fn parse_block(r: &mut Cursor<&Vec<u8>>) -> Result<Block, ParseError> {
 fn parse_transactions(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Transaction>, ParseError> {
 
     let mut result : Vec<Transaction> = Vec::new();
-    let count = parse_varint(r).map_err(|_| ParseError::TransactionsCount)?;
+    let count = varint::parse_varint(r).map_err(|_| ParseError::TransactionsCount)?;
 
     for _ in 0..count {
         let transaction = parse_transaction(r)?;
@@ -199,7 +157,7 @@ fn parse_transaction(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, ParseError
 fn parse_witnesses(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Witness>, ParseError> {
 
     let mut result : Vec<Witness> = Vec::new();
-    let count = parse_varint(r).map_err(|_| ParseError::WitnessesCount)?;
+    let count = varint::parse_varint(r).map_err(|_| ParseError::WitnessesCount)?;
     for _ in 0..count {
         let witness = parse_witness(r)?;
         result.push(witness);
@@ -208,47 +166,10 @@ fn parse_witnesses(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Witness>, ParseError>
     Ok(result)
 }
 
-/// https://en.bitcoin.it/wiki/Protocol_documentation#Transaction_Verification
-/// 
-/// Variable length integer
-/// Integer can be encoded depending on the represented value to save space. 
-/// Variable length integers always precede an array/vector of a type of data 
-/// that may vary in length. Longer numbers are encoded in little endian.
-/// 
-/// +----------------+-----------------+----------------------------------------------+
-/// | Value          | Storage length  |  Format                                      |
-/// +----------------+-----------------+----------------------------------------------+
-/// | < 0xFD         | 1               |  uint8_t                                     |
-/// +----------------+-----------------+----------------------------------------------+
-/// | <= 0xFFFF      | 3               |  0xFD followed by the length as uint16_t     |
-/// +----------------+-----------------+----------------------------------------------+
-/// | <= 0xFFFF FFFF | 5               |  0xFE followed by the length as uint32_t     |
-/// +----------------+-----------------+----------------------------------------------+
-/// | -              | 9               |  0xFF followed by the length as uint64_t     |
-/// +----------------+-----------------+----------------------------------------------+
-/// 
-/// If you're reading the Satoshi client code (BitcoinQT) it refers to this 
-/// encoding as a "CompactSize". Modern BitcoinQT also has the CVarInt class 
-/// which implements an even more compact integer for the purpose of local 
-/// storage (which is incompatible with "CompactSize" described here). 
-/// CVarInt is not a part of the protocol.
-/// 
-fn parse_varint(r: &mut Cursor<&Vec<u8>>) -> Result<usize, ParseError> {
-
-    let varlen = r.read_u8().map_err(|_| ParseError::VarInt)?;
-    match varlen {
-        0xFD => r.read_u16::<LittleEndian>().map(|v| v as usize),
-        0xFE => r.read_u32::<LittleEndian>().map(|v| v as usize),
-        0xFF => r.read_u64::<LittleEndian>().map(|v| v as usize),
-        _ => Ok(varlen as usize)
-    }
-    .map_err(|_| ParseError::VarInt2)
-
-}
 
 fn parse_witness(r: &mut Cursor<&Vec<u8>>) -> Result<Witness, ParseError> {
 
-    let varlen = parse_varint(r).map_err(|_| ParseError::WitnessLen)?;
+    let varlen = varint::parse_varint(r).map_err(|_| ParseError::WitnessLen)?;
     let mut data = vec![0u8; varlen];
     let mut data_ref = data.as_mut_slice();
     r.read_exact(&mut data_ref).map_err(|_| ParseError::WitnessData)?;
@@ -263,7 +184,7 @@ fn parse_witness(r: &mut Cursor<&Vec<u8>>) -> Result<Witness, ParseError> {
 fn parse_inputs(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxIn>, ParseError> {
 
     let mut result : Vec<TxIn> = Vec::new();
-    let count = parse_varint(r).map_err(|_| ParseError::InputsCount)?;
+    let count = varint::parse_varint(r).map_err(|_| ParseError::InputsCount)?;
     for _ in 0..count {
         let input = parse_input(r)?;
         result.push(input);
@@ -304,7 +225,7 @@ fn parse_input(r: &mut Cursor<&Vec<u8>>) -> Result<TxIn, ParseError> {
 fn parse_outputs(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxOut>, ParseError> {
 
     let mut result : Vec<TxOut> = Vec::new();
-    let count = parse_varint(r).map_err(|_| ParseError::OutputsCount)?;
+    let count = varint::parse_varint(r).map_err(|_| ParseError::OutputsCount)?;
 
     for _ in 0..count {
         let output = parse_output(r)?;
@@ -336,7 +257,7 @@ fn parse_output(r: &mut Cursor<&Vec<u8>>) -> Result<TxOut, ParseError> {
 
 fn parse_script(r: &mut Cursor<&Vec<u8>>) -> Result<Script, ParseError> {
 
-    let scriptlen = parse_varint(r).map_err(|_| ParseError::ScriptLen)?;
+    let scriptlen = varint::parse_varint(r).map_err(|_| ParseError::ScriptLen)?;
     let mut content = vec![0u8; scriptlen];
     let mut content_ref = content.as_mut_slice();
     r.read_exact(&mut content_ref).map_err(|_| ParseError::ScriptContent)?;

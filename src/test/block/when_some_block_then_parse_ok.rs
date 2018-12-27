@@ -3,7 +3,7 @@ use crate::bo::transaction::Transaction;
 use crate::bo::txin::TxIn;
 use crate::bo::txout::TxOut;
 use crate::business::block;
-use crate::business::block::ParseError;
+use crate::business::error::ParseError;
 use crate::hexdump;
 
 #[test]
