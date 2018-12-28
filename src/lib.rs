@@ -6,4 +6,3 @@ extern crate hex;
 pub mod bo;
 pub mod business;
 pub mod hexdump;
-mod test;

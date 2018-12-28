@@ -13,7 +13,9 @@
                     "test",
                     "--no-run",
                     "--lib",
-                    "--package=rbtc"
+                    "--package=rbtc",
+                    "--verbose",
+                    "--tests"
                 ],
                 "filter": {
                     "kind": "lib"

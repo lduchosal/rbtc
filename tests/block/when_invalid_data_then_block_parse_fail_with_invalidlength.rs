@@ -1,7 +1,7 @@
 
-use crate::business::block;
-use crate::business::error::ParseError;
-use crate::hexdump;
+use rbtc::business::block;
+use rbtc::business::error::ParseError;
+use rbtc::hexdump;
 
 #[test]
 fn test() {

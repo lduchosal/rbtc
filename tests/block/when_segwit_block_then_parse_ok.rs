@@ -1,12 +1,14 @@
-use crate::bo::witness::Witness;
-use crate::bo::block::Block;
-use crate::bo::outpoint::OutPoint;
-use crate::bo::transaction::Transaction;
-use crate::bo::txin::TxIn;
-use crate::bo::txout::TxOut;
-use crate::business::block;
-use crate::business::error::ParseError;
-use crate::hexdump;
+use rbtc::bo::witness::Witness;
+use rbtc::bo::block::Block;
+use rbtc::bo::outpoint::OutPoint;
+use rbtc::bo::transaction::Transaction;
+use rbtc::bo::txin::TxIn;
+use rbtc::bo::txout::TxOut;
+
+use rbtc::business::block;
+use rbtc::business::error::ParseError;
+
+use rbtc::hexdump;
 
 #[test]
 fn test() {

@@ -46,6 +46,7 @@ pub(crate) fn parse_varint(r: &mut Cursor<&Vec<u8>>) -> Result<usize, ParseError
 mod test {
 
     use crate::business::varint;
+    use crate::business::error::ParseError;
     use std::io::Cursor;
 
     #[test]
@@ -124,5 +125,55 @@ mod test {
 
         let result = varint.unwrap();
         assert_eq!(result, 0x0001020304050607);
+    }
+
+
+    #[test]
+    fn when_parse_varint_0xff_too_small_then_fail_parseerror_varint_ff() {
+
+        let data : Vec<u8> = vec![0xff, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02];
+        let mut c = Cursor::new(data.as_ref());
+        let varint = varint::parse_varint(&mut c);
+        assert!(varint.is_err());
+        assert_eq!(c.position(), 1);
+
+        if let Err(e) = varint {
+            assert_eq!(e, ParseError::VarIntFF);
+        } else {
+            panic!("should have failed");
+        }
+    }
+
+
+    #[test]
+    fn when_parse_varint_0xfe_too_small_then_fail_parseerror_varint_fe() {
+
+        let data : Vec<u8> = vec![0xfe, 0x07, 0x06, 0x05 ];
+        let mut c = Cursor::new(data.as_ref());
+        let varint = varint::parse_varint(&mut c);
+        assert!(varint.is_err());
+        assert_eq!(c.position(), 1);
+
+        if let Err(e) = varint {
+            assert_eq!(e, ParseError::VarIntFE);
+        } else {
+            panic!("should have failed");
+        }
+    }
+
+    #[test]
+    fn when_parse_varint_0xfd_too_small_then_fail_parseerror_varint_fd() {
+
+        let data : Vec<u8> = vec![0xfd, 0x07 ];
+        let mut c = Cursor::new(data.as_ref());
+        let varint = varint::parse_varint(&mut c);
+        assert!(varint.is_err());
+        assert_eq!(c.position(), 1);
+
+        if let Err(e) = varint {
+            assert_eq!(e, ParseError::VarIntFD);
+        } else {
+            panic!("should have failed");
+        }
     }
 }
