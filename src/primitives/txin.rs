@@ -11,8 +11,8 @@
 //     CScript scriptSig;
 //     uint32_t nSequence;
 //     CScriptWitness scriptWitness; //!< Only serialized through CTransaction
-use crate::bo::script::Script;
-use crate::bo::outpoint::OutPoint;
+use crate::primitives::script::Script;
+use crate::primitives::outpoint::OutPoint;
 
 #[derive(Debug)]
 pub struct TxIn {

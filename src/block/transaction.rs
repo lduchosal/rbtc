@@ -1,10 +1,10 @@
-use crate::business::error::ParseError;
-use crate::business::varint;
-use crate::business::txin;
-use crate::business::txout;
-use crate::business::witness;
+use crate::block::error::ParseError;
+use crate::block::varint;
+use crate::block::txin;
+use crate::block::txout;
+use crate::block::witness;
 
-use crate::bo::transaction::Transaction;
+use crate::primitives::transaction::Transaction;
 
 use std::io::Cursor;
 use byteorder::{LittleEndian, ReadBytesExt};

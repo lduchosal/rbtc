@@ -5,9 +5,9 @@
 //  */
 // class CTransaction
 // {
-use crate::bo::txout::TxOut;
-use crate::bo::txin::TxIn;
-use crate::bo::witness::Witness;
+use crate::primitives::txout::TxOut;
+use crate::primitives::txin::TxIn;
+use crate::primitives::witness::Witness;
 
 #[derive(Debug)]
 pub struct Transaction {

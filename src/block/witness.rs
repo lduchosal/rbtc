@@ -1,7 +1,7 @@
-use crate::business::error::ParseError;
-use crate::business::varint;
+use crate::block::error::ParseError;
+use crate::block::varint;
 
-use crate::bo::witness::Witness;
+use crate::primitives::witness::Witness;
 
 use std::io::Read;
 use std::io::Cursor;
@@ -37,10 +37,10 @@ pub(crate) fn parse_witness(r: &mut Cursor<&Vec<u8>>) -> Result<Witness, ParseEr
 #[cfg(test)]
 mod test {
 
-    use crate::business::witness;
-    use crate::business::error::ParseError;
+    use crate::block::witness;
+    use crate::block::error::ParseError;
 
-    use crate::bo::witness::Witness;
+    use crate::primitives::witness::Witness;
 
     use std::io::Cursor;
 

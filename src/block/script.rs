@@ -1,7 +1,7 @@
-use crate::business::error::ParseError;
-use crate::business::varint;
+use crate::block::error::ParseError;
+use crate::block::varint;
 
-use crate::bo::script::Script;
+use crate::primitives::script::Script;
 
 use std::io::Read;
 use std::io::Cursor;
@@ -24,10 +24,10 @@ pub(crate) fn parse_script(r: &mut Cursor<&Vec<u8>>) -> Result<Script, ParseErro
 #[cfg(test)]
 mod test {
 
-    use crate::business::script;
-    use crate::business::error::ParseError;
+    use crate::block::script;
+    use crate::block::error::ParseError;
 
-    use crate::bo::script::Script;
+    use crate::primitives::script::Script;
 
     use std::io::Cursor;
 

@@ -1,14 +1,14 @@
-use rbtc::bo::witness::Witness;
-use rbtc::bo::block::Block;
-use rbtc::bo::outpoint::OutPoint;
-use rbtc::bo::transaction::Transaction;
-use rbtc::bo::txin::TxIn;
-use rbtc::bo::txout::TxOut;
+use rbtc::primitives::witness::Witness;
+use rbtc::primitives::block::Block;
+use rbtc::primitives::outpoint::OutPoint;
+use rbtc::primitives::transaction::Transaction;
+use rbtc::primitives::txin::TxIn;
+use rbtc::primitives::txout::TxOut;
 
-use rbtc::business::block;
-use rbtc::business::error::ParseError;
+use rbtc::block::block;
+use rbtc::block::error::ParseError;
 
-use rbtc::hexdump;
+use rbtc::utils::hexdump;
 
 #[test]
 fn test() {

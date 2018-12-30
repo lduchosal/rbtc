@@ -1,7 +1,7 @@
 
-use rbtc::business::block;
-use rbtc::business::error::ParseError;
-use rbtc::hexdump;
+use rbtc::block::block;
+use rbtc::block::error::ParseError;
+use rbtc::utils::hexdump;
 
 #[test]
 fn test() {

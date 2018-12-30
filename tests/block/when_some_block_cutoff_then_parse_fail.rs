@@ -1,10 +1,10 @@
-use rbtc::bo::outpoint::OutPoint;
-use rbtc::bo::transaction::Transaction;
-use rbtc::bo::txin::TxIn;
-use rbtc::bo::txout::TxOut;
-use rbtc::business::block;
-use rbtc::business::error::ParseError;
-use rbtc::hexdump;
+use rbtc::primitives::outpoint::OutPoint;
+use rbtc::primitives::transaction::Transaction;
+use rbtc::primitives::txin::TxIn;
+use rbtc::primitives::txout::TxOut;
+use rbtc::block::block;
+use rbtc::block::error::ParseError;
+use rbtc::utils::hexdump;
 
 #[test]
 fn test() {

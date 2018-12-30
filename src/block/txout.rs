@@ -1,8 +1,8 @@
-use crate::business::error::ParseError;
-use crate::business::script;
-use crate::business::varint;
+use crate::block::error::ParseError;
+use crate::block::script;
+use crate::block::varint;
 
-use crate::bo::txout::TxOut;
+use crate::primitives::txout::TxOut;
 
 use std::io::Cursor;
 use byteorder::{LittleEndian, ReadBytesExt};

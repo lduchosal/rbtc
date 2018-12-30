@@ -1,9 +1,9 @@
-use crate::business::error::ParseError;
-use crate::business::script;
-use crate::business::varint;
+use crate::block::error::ParseError;
+use crate::block::script;
+use crate::block::varint;
 
-use crate::bo::outpoint::OutPoint;
-use crate::bo::txin::TxIn;
+use crate::primitives::outpoint::OutPoint;
+use crate::primitives::txin::TxIn;
 
 use std::io::Read;
 use std::io::Cursor;

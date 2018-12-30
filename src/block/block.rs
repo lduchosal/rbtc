@@ -1,6 +1,6 @@
-use crate::business::transaction;
-use crate::business::error::ParseError;
-use crate::bo::block::Block;
+use crate::block::transaction;
+use crate::block::error::ParseError;
+use crate::primitives::block::Block;
 
 use std::io::Read;
 use std::io::Cursor;
@@ -71,11 +71,11 @@ fn parse_block(r: &mut Cursor<&Vec<u8>>) -> Result<Block, ParseError> {
 #[cfg(test)]
 mod test {
 
-    use crate::business::block;
-    use crate::hexdump;
-    use crate::business::error::ParseError;
+    use crate::block::block;
+    use crate::utils::hexdump;
+    use crate::block::error::ParseError;
 
-    use crate::bo::block::Block;
+    use crate::primitives::block::Block;
     use std::io::Cursor;
 
     #[test]

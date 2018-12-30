@@ -1,5 +1,5 @@
 
-use crate::business::error::ParseError;
+use crate::block::error::ParseError;
 
 use std::io::Cursor;
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -45,8 +45,8 @@ pub(crate) fn parse_varint(r: &mut Cursor<&Vec<u8>>) -> Result<usize, ParseError
 #[cfg(test)]
 mod test {
 
-    use crate::business::varint;
-    use crate::business::error::ParseError;
+    use crate::block::varint;
+    use crate::block::error::ParseError;
     use std::io::Cursor;
 
     #[test]

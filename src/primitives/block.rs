@@ -1,4 +1,4 @@
-use crate::bo::transaction::Transaction;
+use crate::primitives::transaction::Transaction;
 
 #[derive(Debug)]
 pub struct Block {
