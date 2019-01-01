@@ -7,7 +7,6 @@ use crate::primitives::txout::TxOut;
 use std::io::Cursor;
 use byteorder::{LittleEndian, ReadBytesExt};
 
-
 pub(crate) fn parse_outputs(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxOut>, DecodeError> {
 
     let mut result : Vec<TxOut> = Vec::new();
@@ -20,7 +19,6 @@ pub(crate) fn parse_outputs(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxOut>, Deco
 
     Ok(result)
 }
-
 
 pub(crate) fn parse_output(r: &mut Cursor<&Vec<u8>>) -> Result<TxOut, DecodeError> {
 

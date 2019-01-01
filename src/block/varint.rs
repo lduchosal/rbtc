@@ -80,14 +80,13 @@ pub(crate) fn encode(w: &mut Vec<u8>, size: u64) -> Result<(), EncodeError> {
     };
 
     Ok(())
-
 }
 
 #[cfg(test)]
 mod test {
 
     use crate::block::varint;
-    use crate::block::error::DecodeError;
+    use crate::block::varint::DecodeError;
     use std::io::Cursor;
 
     #[test]
@@ -216,5 +215,69 @@ mod test {
         } else {
             panic!("should have failed");
         }
+    }
+
+    #[test]
+    fn when_encode_varint_0xffffffffffffffff_then_size_9() {
+
+        let data : u64 = 0xFFFFFFFFFFFFFFFF;
+        let mut result : Vec<u8> = Vec::new();
+        let varint = varint::encode(&mut result, data);
+
+        assert!(varint.is_ok());
+        assert_eq!(result, vec!(0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF) )
+    }
+
+    #[test]
+    fn when_encode_varint_0xffffff_then_size_5() {
+
+        let data : u64 = 0xFFFFFFFF;
+        let mut result : Vec<u8> = Vec::new();
+        let varint = varint::encode(&mut result, data);
+
+        assert!(varint.is_ok());
+        assert_eq!(result, vec!(0xFE, 0xFF, 0xFF, 0xFF, 0xFF) )
+    }
+
+    #[test]
+    fn when_encode_varint_0xffff_then_size_3() {
+
+        let data : u64 = 0xFFFF;
+        let mut result : Vec<u8> = Vec::new();
+        let varint = varint::encode(&mut result, data);
+
+        assert!(varint.is_ok());
+        assert_eq!(result, vec!(0xFD, 0xFF, 0xFF) )
+    }
+    #[test]
+    fn when_encode_varint_0xfd_then_size_3() {
+
+        let data : u64 = 0xFD;
+        let mut result : Vec<u8> = Vec::new();
+        let varint = varint::encode(&mut result, data);
+
+        assert!(varint.is_ok());
+        assert_eq!(result, vec!(0xFD, 0xFD, 0x00));
+    }
+
+    #[test]
+    fn when_encode_varint_0xf0_then_size_1() {
+
+        let data : u64 = 0xF0;
+        let mut result : Vec<u8> = Vec::new();
+        let varint = varint::encode(&mut result, data);
+
+        assert!(varint.is_ok());
+        assert_eq!(result, vec!(0xF0 ));
+    }
+    #[test]
+    fn when_encode_varint_0xfc_then_size_1() {
+
+        let data : u64 = 0xFC;
+        let mut result : Vec<u8> = Vec::new();
+        let varint = varint::encode(&mut result, data);
+
+        assert!(varint.is_ok());
+        assert_eq!(result, vec!(0xFC));
     }
 }

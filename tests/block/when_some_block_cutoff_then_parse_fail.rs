@@ -1,5 +1,5 @@
 use rbtc::block::block;
-use rbtc::block::error::EncodeError;
+use rbtc::block::error::DecodeError;
 use rbtc::utils::hexdump;
 
 #[test]
@@ -56,5 +56,5 @@ fn test() {
 
     let err = result.err().unwrap();
 
-    assert_eq!(err, EncodeError::TransactionLockTime);
+    assert_eq!(err, DecodeError::TransactionLockTime);
 }

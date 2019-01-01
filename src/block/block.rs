@@ -12,7 +12,7 @@ pub fn parse(hex: &Vec<u8>) -> Result<Block, DecodeError> {
         return Err(DecodeError::InvalidLength);
     }
     let mut r = Cursor::new(hex);
-    let result = parse_block(&mut r)?;
+    let result = decode(&mut r)?;
 
     if r.position() as usize != hex.len() {
         return Err(DecodeError::RemainingContent);
@@ -38,8 +38,7 @@ pub fn parse(hex: &Vec<u8>) -> Result<Block, DecodeError> {
 /// |                      |                                                |  many transactions       |
 /// +----------------------+------------------------------------------------+--------------------------+
 /// 
-
-fn parse_block(r: &mut Cursor<&Vec<u8>>) -> Result<Block, DecodeError> {
+fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Block, DecodeError> {
 
     let version = r.read_u32::<LittleEndian>().map_err(|_| DecodeError::BlockVersion)?;
 
@@ -79,7 +78,7 @@ mod test {
     use std::io::Cursor;
 
     #[test]
-    fn when_parse_block_with_empty_vec_then_fail_parse_error_blockversion() {
+    fn when_decode_with_empty_vec_then_fail_parse_error_blockversion() {
 
         let dump = "
 00000000                                                      ................
@@ -87,7 +86,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::parse(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::parse_block(&mut c);
+        let block = block::decode(&mut c);
         assert!(block.is_err());
         assert_eq!(c.position(), 0);
 
@@ -99,7 +98,7 @@ mod test {
     }
 
     #[test]
-    fn when_parse_block_with_1_vec_then_fail_parse_error_blockversion() {
+    fn when_decode_with_1_vec_then_fail_parse_error_blockversion() {
 
         let dump = "
 00000000   01                                                 ................
@@ -107,7 +106,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::parse(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::parse_block(&mut c);
+        let block = block::decode(&mut c);
         assert!(block.is_err());
         assert_eq!(c.position(), 0);
 
@@ -120,7 +119,7 @@ mod test {
 
 
     #[test]
-    fn when_parse_block_with_4_vec_then_fail_parse_error_blockprevious() {
+    fn when_decode_with_4_vec_then_fail_parse_error_blockprevious() {
 
         let dump = "
 00000000   01 00 00 00                                        ver.............
@@ -128,7 +127,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::parse(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::parse_block(&mut c);
+        let block = block::decode(&mut c);
         assert!(block.is_err());
         assert_eq!(c.position(), 4);
 
@@ -141,7 +140,7 @@ mod test {
 
 
     #[test]
-    fn when_parse_block_with_36_vec_then_fail_parse_error_blockmerkleroot() {
+    fn when_decode_with_36_vec_then_fail_parse_error_blockmerkleroot() {
 
         let dump = "
 00000000   01 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00   ver.previous.pre
@@ -151,7 +150,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::parse(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::parse_block(&mut c);
+        let block = block::decode(&mut c);
         assert!(block.is_err());
         assert_eq!(c.position(), 36);
 
@@ -163,7 +162,7 @@ mod test {
     }
 
     #[test]
-    fn when_parse_block_with_68_vec_then_fail_parse_error_blocktime() {
+    fn when_decode_with_68_vec_then_fail_parse_error_blocktime() {
 
         let dump = "
 00000000   01 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00   ver.previous.pre
@@ -175,7 +174,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::parse(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::parse_block(&mut c);
+        let block = block::decode(&mut c);
         assert!(block.is_err());
         assert_eq!(c.position(), 68);
 
@@ -188,7 +187,7 @@ mod test {
 
 
     #[test]
-    fn when_parse_block_with_68_vec_then_fail_parse_error_bits() {
+    fn when_decode_with_68_vec_then_fail_parse_error_bits() {
 
         let dump = "
 00000000   01 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00   ver.previous.pre
@@ -200,7 +199,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::parse(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::parse_block(&mut c);
+        let block = block::decode(&mut c);
         assert!(block.is_err());
         assert_eq!(c.position(), 72);
 
@@ -212,7 +211,7 @@ mod test {
     }
 
     #[test]
-    fn when_parse_block_with_68_vec_then_fail_parse_error_nonce() {
+    fn when_decode_with_68_vec_then_fail_parse_error_nonce() {
 
         let dump = "
 00000000   01 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00   ver.previous.pre
@@ -224,7 +223,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::parse(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::parse_block(&mut c);
+        let block = block::decode(&mut c);
         assert!(block.is_err());
         assert_eq!(c.position(), 76);
 
@@ -237,7 +236,7 @@ mod test {
 
 
     #[test]
-    fn when_parse_block_with_68_vec_then_fail_parse_error_transaction_count() {
+    fn when_decode_with_68_vec_then_fail_parse_error_transaction_count() {
 
         let dump = "
 00000000   01 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00   ver.previous.pre
@@ -249,7 +248,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::parse(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::parse_block(&mut c);
+        let block = block::decode(&mut c);
         assert!(block.is_err());
         assert_eq!(c.position(), 80);
 
@@ -261,7 +260,7 @@ mod test {
     }
 
     #[test]
-    fn when_parse_block_with_68_vec_then_parse_ok() {
+    fn when_decode_with_68_vec_then_parse_ok() {
 
         let dump = "
 00000000   01 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00   ver.previous.pre
@@ -274,7 +273,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::parse(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::parse_block(&mut c);
+        let block = block::decode(&mut c);
         assert!(block.is_ok());
         assert_eq!(c.position(), 81);
 
@@ -292,7 +291,7 @@ mod test {
     }
 
     #[test]
-    fn when_parse_block_with_68_numbered_then_parse_ok() {
+    fn when_decode_with_68_numbered_then_parse_ok() {
 
         let dump = "
 00000000   00 01 02 03 04 05 06 07 08  09 0A 0B 0C 0D 0E 0F   ver.previous.pre
@@ -305,7 +304,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::parse(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::parse_block(&mut c);
+        let block = block::decode(&mut c);
         assert!(block.is_ok());
         assert_eq!(c.position(), 81);
 
@@ -325,8 +324,5 @@ mod test {
         assert_eq!(b.nonce, 0x0F0E0D0C, "b.nonce");
         assert_eq!(b.transactions.len(), 0, "b.transactions.len");
 
-
     }
-
-
 }

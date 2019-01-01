@@ -1,7 +1,7 @@
 
 #[derive(PartialEq, Debug)]
 pub enum DecodeError {
-    
+ 
     InvalidLength,
     RemainingContent,
 
@@ -11,7 +11,7 @@ pub enum DecodeError {
     BlockTime,
     BlockNonce,
     BlockBits,
-
+    
     TransactionsCount,
     TransactionFlag,
     TransactionVersion,
