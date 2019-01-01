@@ -1,8 +1,22 @@
 
-use crate::block::error::EncodeError;
-
 use std::io::Cursor;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+
+#[derive(PartialEq, Debug)]
+pub enum EncodeError {
+    VarInt,
+    VarIntFD,
+    VarIntFE,
+    VarIntFF,
+}
+
+#[derive(PartialEq, Debug)]
+pub enum DecodeError {
+    VarInt,
+    VarIntFD,
+    VarIntFE,
+    VarIntFF,
+}
 
 /// https://en.bitcoin.it/wiki/Protocol_documentation#Transaction_Verification
 /// 
@@ -29,27 +43,16 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 /// storage (which is incompatible with "CompactSize" described here). 
 /// CVarInt is not a part of the protocol.
 /// 
-pub(crate) fn parse_varint(r: &mut Cursor<&Vec<u8>>) -> Result<usize, EncodeError> {
+pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<u64, DecodeError> {
 
-    let varlen = r.read_u8().map_err(|_| EncodeError::VarInt)?;
+    let varlen = r.read_u8().map_err(|_| DecodeError::VarInt)?;
     match varlen {
-        0xFD => r.read_u16::<LittleEndian>().map(|v| v as usize).map_err(|_| EncodeError::VarIntFD),
-        0xFE => r.read_u32::<LittleEndian>().map(|v| v as usize).map_err(|_| EncodeError::VarIntFE),
-        0xFF => r.read_u64::<LittleEndian>().map(|v| v as usize).map_err(|_| EncodeError::VarIntFF),
-        _ => Ok(varlen as usize)
+        0xFD => r.read_u16::<LittleEndian>().map(|v| v as u64).map_err(|_| DecodeError::VarIntFD),
+        0xFE => r.read_u32::<LittleEndian>().map(|v| v as u64).map_err(|_| DecodeError::VarIntFE),
+        0xFF => r.read_u64::<LittleEndian>().map(|v| v as u64).map_err(|_| DecodeError::VarIntFF),
+        _ => Ok(varlen as u64)
     }
 
-}
-
-#[derive(PartialEq, Debug)]
-pub enum EncodeError {
-    VarIntData,
-    VarIntFD,
-    VarIntFDdata,
-    VarIntFE,
-    VarIntFEData,
-    VarIntFF,
-    VarIntFFData
 }
 
 pub(crate) fn encode(w: &mut Vec<u8>, size: u64) -> Result<(), EncodeError> {
@@ -61,18 +64,18 @@ pub(crate) fn encode(w: &mut Vec<u8>, size: u64) -> Result<(), EncodeError> {
         _ => 0xFF,
     };
 
-    w.write_u8(size_enc).map_err(|_| EncodeError::VarIntData)?;
+    w.write_u8(size_enc).map_err(|_| EncodeError::VarInt)?;
 
     match size {
         0...0xFC => {},
         0xFD...0xFFFF => {
-            w.write_u16::<LittleEndian>(size as u16).map_err(|_| EncodeError::VarIntFDdata)?;
+            w.write_u16::<LittleEndian>(size as u16).map_err(|_| EncodeError::VarIntFD)?;
         },
         0x10000...0xFFFFFFFF => {
-            w.write_u32::<LittleEndian>(size as u32).map_err(|_| EncodeError::VarIntFEData)?;
+            w.write_u32::<LittleEndian>(size as u32).map_err(|_| EncodeError::VarIntFE)?;
         },
         _ => {
-            w.write_u64::<LittleEndian>(size).map_err(|_| EncodeError::VarIntFFData)?;
+            w.write_u64::<LittleEndian>(size).map_err(|_| EncodeError::VarIntFF)?;
         },
     };
 
@@ -84,15 +87,15 @@ pub(crate) fn encode(w: &mut Vec<u8>, size: u64) -> Result<(), EncodeError> {
 mod test {
 
     use crate::block::varint;
-    use crate::block::error::EncodeError;
+    use crate::block::error::DecodeError;
     use std::io::Cursor;
 
     #[test]
-    fn when_parse_varint_0x00_then_1_byte() {
+    fn when_decode_varint_0x00_then_1_byte() {
 
         let data : Vec<u8> = vec![0x00, 0x00, 0x00, 0x00];
         let mut c = Cursor::new(data.as_ref());
-        let varint = varint::parse_varint(&mut c);
+        let varint = varint::decode(&mut c);
         assert!(varint.is_ok());
         assert_eq!(c.position(), 1);
 
@@ -101,11 +104,11 @@ mod test {
     }
 
     #[test]
-    fn when_parse_varint_0xfc_then_1_byte() {
+    fn when_decode_varint_0xfc_then_1_byte() {
 
         let data : Vec<u8> = vec![0xfc, 0x00, 0x00, 0x00];
         let mut c = Cursor::new(data.as_ref());
-        let varint = varint::parse_varint(&mut c);
+        let varint = varint::decode(&mut c);
         assert!(varint.is_ok());
         assert_eq!(c.position(), 1);
 
@@ -114,11 +117,11 @@ mod test {
     }
 
     #[test]
-    fn when_parse_varint_0xfd_then_3_byte() {
+    fn when_decode_varint_0xfd_then_3_byte() {
 
         let data : Vec<u8> = vec![0xfd, 0xfe, 0x00, 0x00];
         let mut c = Cursor::new(data.as_ref());
-        let varint = varint::parse_varint(&mut c);
+        let varint = varint::decode(&mut c);
         assert!(varint.is_ok());
         assert_eq!(c.position(), 3);
 
@@ -127,11 +130,11 @@ mod test {
     }
 
     #[test]
-    fn when_parse_varint_0xfd_fe_01_then_3_byte() {
+    fn when_decode_varint_0xfd_fe_01_then_3_byte() {
 
         let data : Vec<u8> = vec![0xfd, 0xfe, 0x01, 0x00];
         let mut c = Cursor::new(data.as_ref());
-        let varint = varint::parse_varint(&mut c);
+        let varint = varint::decode(&mut c);
         assert!(varint.is_ok());
         assert_eq!(c.position(), 3);
 
@@ -141,11 +144,11 @@ mod test {
 
 
     #[test]
-    fn when_parse_varint_0xfe_then_5_byte() {
+    fn when_decode_varint_0xfe_then_5_byte() {
 
         let data : Vec<u8> = vec![0xfe, 0x03, 0x02, 0x01, 0x00];
         let mut c = Cursor::new(data.as_ref());
-        let varint = varint::parse_varint(&mut c);
+        let varint = varint::decode(&mut c);
         assert!(varint.is_ok());
         assert_eq!(c.position(), 5);
 
@@ -153,11 +156,11 @@ mod test {
         assert_eq!(result, 0x00010203);
     }
     #[test]
-    fn when_parse_varint_0xff_then_9_byte() {
+    fn when_decode_varint_0xff_then_9_byte() {
 
         let data : Vec<u8> = vec![0xff, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00];
         let mut c = Cursor::new(data.as_ref());
-        let varint = varint::parse_varint(&mut c);
+        let varint = varint::decode(&mut c);
         assert!(varint.is_ok());
         assert_eq!(c.position(), 9);
 
@@ -167,16 +170,16 @@ mod test {
 
 
     #[test]
-    fn when_parse_varint_0xff_too_small_then_fail_parseerror_varint_ff() {
+    fn when_decode_varint_0xff_too_small_then_fail_parseerror_varint_ff() {
 
         let data : Vec<u8> = vec![0xff, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02];
         let mut c = Cursor::new(data.as_ref());
-        let varint = varint::parse_varint(&mut c);
+        let varint = varint::decode(&mut c);
         assert!(varint.is_err());
         assert_eq!(c.position(), 1);
 
         if let Err(e) = varint {
-            assert_eq!(e, EncodeError::VarIntFF);
+            assert_eq!(e, DecodeError::VarIntFF);
         } else {
             panic!("should have failed");
         }
@@ -184,32 +187,32 @@ mod test {
 
 
     #[test]
-    fn when_parse_varint_0xfe_too_small_then_fail_parseerror_varint_fe() {
+    fn when_decode_varint_0xfe_too_small_then_fail_parseerror_varint_fe() {
 
         let data : Vec<u8> = vec![0xfe, 0x07, 0x06, 0x05 ];
         let mut c = Cursor::new(data.as_ref());
-        let varint = varint::parse_varint(&mut c);
+        let varint = varint::decode(&mut c);
         assert!(varint.is_err());
         assert_eq!(c.position(), 1);
 
         if let Err(e) = varint {
-            assert_eq!(e, EncodeError::VarIntFE);
+            assert_eq!(e, DecodeError::VarIntFE);
         } else {
             panic!("should have failed");
         }
     }
 
     #[test]
-    fn when_parse_varint_0xfd_too_small_then_fail_parseerror_varint_fd() {
+    fn when_decode_varint_0xfd_too_small_then_fail_parseerror_varint_fd() {
 
         let data : Vec<u8> = vec![0xfd, 0x07 ];
         let mut c = Cursor::new(data.as_ref());
-        let varint = varint::parse_varint(&mut c);
+        let varint = varint::decode(&mut c);
         assert!(varint.is_err());
         assert_eq!(c.position(), 1);
 
         if let Err(e) = varint {
-            assert_eq!(e, EncodeError::VarIntFD);
+            assert_eq!(e, DecodeError::VarIntFD);
         } else {
             panic!("should have failed");
         }

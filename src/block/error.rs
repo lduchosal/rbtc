@@ -1,6 +1,6 @@
 
 #[derive(PartialEq, Debug)]
-pub enum EncodeError {
+pub enum DecodeError {
     
     InvalidLength,
     RemainingContent,

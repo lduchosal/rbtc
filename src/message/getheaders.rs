@@ -103,7 +103,7 @@ pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<GetHeadersMessage, DecodeError
 fn decode_locators(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Sha256>, DecodeError> {
 
     let mut result : Vec<Sha256> = Vec::new();
-    let count = varint::parse_varint(r).map_err(|_| DecodeError::LocatorsCount)?;
+    let count = varint::decode(r).map_err(|_| DecodeError::LocatorsCount)?;
 
     for _ in 0..count {
         let mut hash = [0; 32];

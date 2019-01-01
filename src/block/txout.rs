@@ -1,4 +1,4 @@
-use crate::block::error::EncodeError;
+use crate::block::error::DecodeError;
 use crate::block::script;
 use crate::block::varint;
 
@@ -8,10 +8,10 @@ use std::io::Cursor;
 use byteorder::{LittleEndian, ReadBytesExt};
 
 
-pub(crate) fn parse_outputs(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxOut>, EncodeError> {
+pub(crate) fn parse_outputs(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxOut>, DecodeError> {
 
     let mut result : Vec<TxOut> = Vec::new();
-    let count = varint::parse_varint(r).map_err(|_| EncodeError::OutputsCount)?;
+    let count = varint::decode(r).map_err(|_| DecodeError::OutputsCount)?;
 
     for _ in 0..count {
         let output = parse_output(r)?;
@@ -22,14 +22,14 @@ pub(crate) fn parse_outputs(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxOut>, Enco
 }
 
 
-pub(crate) fn parse_output(r: &mut Cursor<&Vec<u8>>) -> Result<TxOut, EncodeError> {
+pub(crate) fn parse_output(r: &mut Cursor<&Vec<u8>>) -> Result<TxOut, DecodeError> {
 
-    let amount = r.read_u64::<LittleEndian>().map_err(|_| EncodeError::TxOutAmount)?;
+    let amount = r.read_u64::<LittleEndian>().map_err(|_| DecodeError::TxOutAmount)?;
     let script_pubkey = script::parse_script(r)
         .map_err(|e| {
             match e {
-                EncodeError::ScriptContent => EncodeError::ScriptPubKeyScriptContent,
-                EncodeError::ScriptLen => EncodeError::ScriptPubKeyScriptLen,
+                DecodeError::ScriptContent => DecodeError::ScriptPubKeyScriptContent,
+                DecodeError::ScriptLen => DecodeError::ScriptPubKeyScriptLen,
                 _ => e
             }
         })?;

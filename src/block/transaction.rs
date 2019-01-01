@@ -1,4 +1,4 @@
-use crate::block::error::EncodeError;
+use crate::block::error::DecodeError;
 use crate::block::varint;
 use crate::block::txin;
 use crate::block::txout;
@@ -40,14 +40,14 @@ use byteorder::{LittleEndian, ReadBytesExt};
 /// |                 |  when transaction is final                   |                              | 
 /// +-----------------+----------------------------------------------+------------------------------+ 
 /// 
-pub fn parse_transaction(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, EncodeError> {
+pub fn parse_transaction(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, DecodeError> {
 
-    let version = r.read_i32::<LittleEndian>().map_err(|_| EncodeError::TransactionVersion)?;
+    let version = r.read_i32::<LittleEndian>().map_err(|_| DecodeError::TransactionVersion)?;
 
     let position = r.position();
     let flag = r.read_u16::<LittleEndian>()
         .map(|v| match v { 0x0100 => Some(v), _ => None })
-        .map_err(|_| EncodeError::TransactionFlag)?;
+        .map_err(|_| DecodeError::TransactionFlag)?;
     
     if flag.is_none() {
         r.set_position(position);
@@ -61,7 +61,7 @@ pub fn parse_transaction(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, Encode
         _ => None
     };
 
-    let locktime = r.read_u32::<LittleEndian>().map_err(|_| EncodeError::TransactionLockTime)?;
+    let locktime = r.read_u32::<LittleEndian>().map_err(|_| DecodeError::TransactionLockTime)?;
 
     let result = Transaction {
         version: version,
@@ -76,10 +76,10 @@ pub fn parse_transaction(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, Encode
 }
 
 
-pub(crate) fn parse_transactions(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Transaction>, EncodeError> {
+pub(crate) fn parse_transactions(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Transaction>, DecodeError> {
 
     let mut result : Vec<Transaction> = Vec::new();
-    let count = varint::parse_varint(r).map_err(|_| EncodeError::TransactionsCount)?;
+    let count = varint::decode(r).map_err(|_| DecodeError::TransactionsCount)?;
 
     for _ in 0..count {
         let transaction = parse_transaction(r)?;
