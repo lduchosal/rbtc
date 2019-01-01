@@ -1,4 +1,4 @@
-use crate::block::error::ParseError;
+use crate::block::error::EncodeError;
 use crate::block::varint;
 
 use crate::primitives::witness::Witness;
@@ -6,10 +6,10 @@ use crate::primitives::witness::Witness;
 use std::io::Read;
 use std::io::Cursor;
 
-pub(crate) fn parse_witnesses(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Witness>, ParseError> {
+pub(crate) fn parse_witnesses(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Witness>, EncodeError> {
 
     let mut result : Vec<Witness> = Vec::new();
-    let count = varint::parse_varint(r).map_err(|_| ParseError::WitnessesCount)?;
+    let count = varint::parse_varint(r).map_err(|_| EncodeError::WitnessesCount)?;
     for _ in 0..count {
         let witness = parse_witness(r)?;
         result.push(witness);
@@ -18,12 +18,12 @@ pub(crate) fn parse_witnesses(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Witness>, 
     Ok(result)
 }
 
-pub(crate) fn parse_witness(r: &mut Cursor<&Vec<u8>>) -> Result<Witness, ParseError> {
+pub(crate) fn parse_witness(r: &mut Cursor<&Vec<u8>>) -> Result<Witness, EncodeError> {
 
-    let varlen = varint::parse_varint(r).map_err(|_| ParseError::WitnessLen)?;
+    let varlen = varint::parse_varint(r).map_err(|_| EncodeError::WitnessLen)?;
     let mut data = vec![0u8; varlen];
     let mut data_ref = data.as_mut_slice();
-    r.read_exact(&mut data_ref).map_err(|_| ParseError::WitnessData)?;
+    r.read_exact(&mut data_ref).map_err(|_| EncodeError::WitnessData)?;
 
     let result = Witness {
         data: data
@@ -38,7 +38,7 @@ pub(crate) fn parse_witness(r: &mut Cursor<&Vec<u8>>) -> Result<Witness, ParseEr
 mod test {
 
     use crate::block::witness;
-    use crate::block::error::ParseError;
+    use crate::block::error::EncodeError;
 
     use crate::primitives::witness::Witness;
 
@@ -108,7 +108,7 @@ mod test {
 
 
         if let Err(e) = parsewitness {
-            assert_eq!(e, ParseError::WitnessData);
+            assert_eq!(e, EncodeError::WitnessData);
         } else {
             panic!("should have failed");
         }
@@ -124,7 +124,7 @@ mod test {
         assert!(parsewitness.is_err());
 
         if let Err(e) = parsewitness {
-            assert_eq!(e, ParseError::WitnessLen);
+            assert_eq!(e, EncodeError::WitnessLen);
         } else {
             panic!("should have failed");
         }

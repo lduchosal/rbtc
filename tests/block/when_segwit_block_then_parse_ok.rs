@@ -6,7 +6,6 @@ use rbtc::primitives::txin::TxIn;
 use rbtc::primitives::txout::TxOut;
 
 use rbtc::block::block;
-use rbtc::block::error::ParseError;
 
 use rbtc::utils::hexdump;
 

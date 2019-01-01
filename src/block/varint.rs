@@ -1,8 +1,8 @@
 
-use crate::block::error::ParseError;
+use crate::block::error::EncodeError;
 
 use std::io::Cursor;
-use byteorder::{LittleEndian, ReadBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 /// https://en.bitcoin.it/wiki/Protocol_documentation#Transaction_Verification
 /// 
@@ -29,16 +29,54 @@ use byteorder::{LittleEndian, ReadBytesExt};
 /// storage (which is incompatible with "CompactSize" described here). 
 /// CVarInt is not a part of the protocol.
 /// 
-pub(crate) fn parse_varint(r: &mut Cursor<&Vec<u8>>) -> Result<usize, ParseError> {
+pub(crate) fn parse_varint(r: &mut Cursor<&Vec<u8>>) -> Result<usize, EncodeError> {
 
-    let varlen = r.read_u8().map_err(|_| ParseError::VarInt)?;
+    let varlen = r.read_u8().map_err(|_| EncodeError::VarInt)?;
     match varlen {
-        0xFD => r.read_u16::<LittleEndian>().map(|v| v as usize).map_err(|_| ParseError::VarIntFD),
-        0xFE => r.read_u32::<LittleEndian>().map(|v| v as usize).map_err(|_| ParseError::VarIntFE),
-        0xFF => r.read_u64::<LittleEndian>().map(|v| v as usize).map_err(|_| ParseError::VarIntFF),
+        0xFD => r.read_u16::<LittleEndian>().map(|v| v as usize).map_err(|_| EncodeError::VarIntFD),
+        0xFE => r.read_u32::<LittleEndian>().map(|v| v as usize).map_err(|_| EncodeError::VarIntFE),
+        0xFF => r.read_u64::<LittleEndian>().map(|v| v as usize).map_err(|_| EncodeError::VarIntFF),
         _ => Ok(varlen as usize)
     }
-    
+
+}
+
+#[derive(PartialEq, Debug)]
+pub enum EncodeError {
+    VarIntData,
+    VarIntFD,
+    VarIntFDdata,
+    VarIntFE,
+    VarIntFEData,
+    VarIntFF,
+    VarIntFFData
+}
+
+pub(crate) fn encode(w: &mut Vec<u8>, size: u64) -> Result<(), EncodeError> {
+
+    let size_enc : u8 = match size {
+        0...0xFC => size as u8,
+        0xFD...0xFFFF => 0xFD,
+        0x10000...0xFFFFFFFF => 0xFE,
+        _ => 0xFF,
+    };
+
+    w.write_u8(size_enc).map_err(|_| EncodeError::VarIntData)?;
+
+    match size {
+        0...0xFC => {},
+        0xFD...0xFFFF => {
+            w.write_u16::<LittleEndian>(size as u16).map_err(|_| EncodeError::VarIntFDdata)?;
+        },
+        0x10000...0xFFFFFFFF => {
+            w.write_u32::<LittleEndian>(size as u32).map_err(|_| EncodeError::VarIntFEData)?;
+        },
+        _ => {
+            w.write_u64::<LittleEndian>(size).map_err(|_| EncodeError::VarIntFFData)?;
+        },
+    };
+
+    Ok(())
 
 }
 
@@ -46,7 +84,7 @@ pub(crate) fn parse_varint(r: &mut Cursor<&Vec<u8>>) -> Result<usize, ParseError
 mod test {
 
     use crate::block::varint;
-    use crate::block::error::ParseError;
+    use crate::block::error::EncodeError;
     use std::io::Cursor;
 
     #[test]
@@ -138,7 +176,7 @@ mod test {
         assert_eq!(c.position(), 1);
 
         if let Err(e) = varint {
-            assert_eq!(e, ParseError::VarIntFF);
+            assert_eq!(e, EncodeError::VarIntFF);
         } else {
             panic!("should have failed");
         }
@@ -155,7 +193,7 @@ mod test {
         assert_eq!(c.position(), 1);
 
         if let Err(e) = varint {
-            assert_eq!(e, ParseError::VarIntFE);
+            assert_eq!(e, EncodeError::VarIntFE);
         } else {
             panic!("should have failed");
         }
@@ -171,7 +209,7 @@ mod test {
         assert_eq!(c.position(), 1);
 
         if let Err(e) = varint {
-            assert_eq!(e, ParseError::VarIntFD);
+            assert_eq!(e, EncodeError::VarIntFD);
         } else {
             panic!("should have failed");
         }

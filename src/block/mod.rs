@@ -1,7 +1,7 @@
 pub mod error;
 pub mod block;
 pub mod transaction;
-mod varint;
+pub (crate) mod varint;
 mod txin;
 mod txout;
 mod script;

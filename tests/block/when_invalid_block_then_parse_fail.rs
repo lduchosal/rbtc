@@ -1,5 +1,5 @@
 
-use rbtc::block::error::ParseError;
+use rbtc::block::error::EncodeError;
 use rbtc::block::block;
 use rbtc::utils::hexdump;
 
@@ -19,6 +19,6 @@ fn test() {
     assert!(result.is_err());
 
     let b = result.err().unwrap();
-    assert_eq!(b, ParseError::InvalidLength);
+    assert_eq!(b, EncodeError::InvalidLength);
 
 }

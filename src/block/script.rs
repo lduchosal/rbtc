@@ -1,4 +1,4 @@
-use crate::block::error::ParseError;
+use crate::block::error::EncodeError;
 use crate::block::varint;
 
 use crate::primitives::script::Script;
@@ -6,12 +6,12 @@ use crate::primitives::script::Script;
 use std::io::Read;
 use std::io::Cursor;
 
-pub(crate) fn parse_script(r: &mut Cursor<&Vec<u8>>) -> Result<Script, ParseError> {
+pub(crate) fn parse_script(r: &mut Cursor<&Vec<u8>>) -> Result<Script, EncodeError> {
 
-    let scriptlen = varint::parse_varint(r).map_err(|_| ParseError::ScriptLen)?;
+    let scriptlen = varint::parse_varint(r).map_err(|_| EncodeError::ScriptLen)?;
     let mut content = vec![0u8; scriptlen];
     let mut content_ref = content.as_mut_slice();
-    r.read_exact(&mut content_ref).map_err(|_| ParseError::ScriptContent)?;
+    r.read_exact(&mut content_ref).map_err(|_| EncodeError::ScriptContent)?;
 
     let result = Script {
         content: content
@@ -25,7 +25,7 @@ pub(crate) fn parse_script(r: &mut Cursor<&Vec<u8>>) -> Result<Script, ParseErro
 mod test {
 
     use crate::block::script;
-    use crate::block::error::ParseError;
+    use crate::block::error::EncodeError;
 
     use crate::primitives::script::Script;
 
@@ -95,7 +95,7 @@ mod test {
 
 
         if let Err(e) = parsescript {
-            assert_eq!(e, ParseError::ScriptContent);
+            assert_eq!(e, EncodeError::ScriptContent);
         } else {
             panic!("should have failed");
         }
@@ -111,7 +111,7 @@ mod test {
         assert!(parsescript.is_err());
 
         if let Err(e) = parsescript {
-            assert_eq!(e, ParseError::ScriptLen);
+            assert_eq!(e, EncodeError::ScriptLen);
         } else {
             panic!("should have failed");
         }

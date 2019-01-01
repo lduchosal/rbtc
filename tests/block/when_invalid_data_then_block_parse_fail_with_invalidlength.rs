@@ -1,6 +1,6 @@
 
 use rbtc::block::block;
-use rbtc::block::error::ParseError;
+use rbtc::block::error::EncodeError;
 use rbtc::utils::hexdump;
 
 #[test]
@@ -36,6 +36,6 @@ fn test() {
     assert!(result.is_err());
 
     let err = result.err().unwrap();
-    assert_eq!(err, ParseError::RemainingContent)
+    assert_eq!(err, EncodeError::RemainingContent)
 
 }

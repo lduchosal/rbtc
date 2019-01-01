@@ -1,9 +1,5 @@
-use rbtc::primitives::outpoint::OutPoint;
-use rbtc::primitives::transaction::Transaction;
-use rbtc::primitives::txin::TxIn;
-use rbtc::primitives::txout::TxOut;
 use rbtc::block::block;
-use rbtc::block::error::ParseError;
+use rbtc::block::error::EncodeError;
 use rbtc::utils::hexdump;
 
 #[test]
@@ -60,5 +56,5 @@ fn test() {
 
     let err = result.err().unwrap();
 
-    assert_eq!(err, ParseError::TransactionLockTime);
+    assert_eq!(err, EncodeError::TransactionLockTime);
 }

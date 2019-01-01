@@ -1,5 +1,5 @@
 #[macro_use]
-extern crate pretty_assertions;
+// extern crate pretty_assertions;
 extern crate regex;
 extern crate hex;
 
