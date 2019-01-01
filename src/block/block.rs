@@ -52,7 +52,7 @@ fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Block, DecodeError> {
     let bits = r.read_u32::<LittleEndian>().map_err(|_| DecodeError::BlockBits)?;
     let nonce = r.read_u32::<LittleEndian>().map_err(|_| DecodeError::BlockNonce)?;
 
-    let transactions = transaction::decodes(r)?;
+    let transactions = transaction::decode_all(r)?;
 
     let result = Block {
         version: version,

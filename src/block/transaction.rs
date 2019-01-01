@@ -53,11 +53,11 @@ pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, DecodeError> {
         r.set_position(position);
     };
 
-    let inputs = txin::parse_inputs(r)?;
-    let outputs = txout::parse_outputs(r)?;
+    let inputs = txin::decode_all(r)?;
+    let outputs = txout::decode_all(r)?;
 
     let witnesses = match flag {
-        Some(_) => Some(witness::parse_witnesses(r)?),
+        Some(_) => Some(witness::decode_all(r)?),
         _ => None
     };
 
@@ -76,7 +76,7 @@ pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, DecodeError> {
 }
 
 
-pub(crate) fn decodes(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Transaction>, DecodeError> {
+pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Transaction>, DecodeError> {
 
     let mut result : Vec<Transaction> = Vec::new();
     let count = varint::decode(r).map_err(|_| DecodeError::TransactionsCount)?;

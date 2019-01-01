@@ -10,19 +10,19 @@ use std::io::Cursor;
 use byteorder::{LittleEndian, ReadBytesExt};
 
 
-pub(crate) fn parse_inputs(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxIn>, DecodeError> {
+pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxIn>, DecodeError> {
 
     let mut result : Vec<TxIn> = Vec::new();
     let count = varint::decode(r).map_err(|_| DecodeError::InputsCount)?;
     for _ in 0..count {
-        let input = parse_input(r)?;
+        let input = decode(r)?;
         result.push(input);
     }
 
     Ok(result)
 }
 
-pub(crate) fn parse_input(r: &mut Cursor<&Vec<u8>>) -> Result<TxIn, DecodeError> {
+pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxIn, DecodeError> {
 
     let mut transaction_hash = [0; 32];
     r.read_exact(&mut transaction_hash).map_err(|_| DecodeError::TxInTransactionHash)?;
