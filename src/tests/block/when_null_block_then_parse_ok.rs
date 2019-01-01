@@ -1,6 +1,6 @@
 
-use rbtc::block::block;
-use rbtc::utils::hexdump;
+use crate::block::block;
+use crate::utils::hexdump;
 
 #[test]
 fn test() {

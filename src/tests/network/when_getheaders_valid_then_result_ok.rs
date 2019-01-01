@@ -1,8 +1,8 @@
 
-use rbtc::utils::sha256::Sha256;
-use rbtc::message::getheaders::GetHeadersMessage;
-use rbtc::message::getheaders;
-use rbtc::utils::hexdump;
+use crate::utils::sha256::Sha256;
+use crate::message::getheaders::GetHeadersMessage;
+use crate::message::getheaders;
+use crate::utils::hexdump;
 
 use std::io::Cursor;
 

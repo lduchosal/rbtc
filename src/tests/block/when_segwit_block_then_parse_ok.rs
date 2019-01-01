@@ -1,13 +1,13 @@
-use rbtc::primitives::witness::Witness;
-use rbtc::primitives::block::Block;
-use rbtc::primitives::outpoint::OutPoint;
-use rbtc::primitives::transaction::Transaction;
-use rbtc::primitives::txin::TxIn;
-use rbtc::primitives::txout::TxOut;
+use crate::primitives::witness::Witness;
+use crate::primitives::block::Block;
+use crate::primitives::outpoint::OutPoint;
+use crate::primitives::transaction::Transaction;
+use crate::primitives::txin::TxIn;
+use crate::primitives::txout::TxOut;
 
-use rbtc::block::block;
+use crate::block::block;
 
-use rbtc::utils::hexdump;
+use crate::utils::hexdump;
 
 #[test]
 fn test() {

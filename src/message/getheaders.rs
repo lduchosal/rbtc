@@ -129,7 +129,7 @@ mod test {
     use std::io::Cursor;
 
     #[test]
-    fn when_parse_with_empty_vec_then_fail_parse_error_version() {
+    fn when_decode_with_empty_vec_then_fail_parse_error_version() {
 
         let dump = "
 00000000                                                      ................
@@ -149,7 +149,7 @@ mod test {
     }
 
     #[test]
-    fn when_parse_with_1_vec_then_fail_parse_error_version() {
+    fn when_decode_with_1_vec_then_fail_parse_error_version() {
 
         let dump = "
 00000000   01                                                 ................
@@ -169,7 +169,7 @@ mod test {
     }
 
     #[test]
-    fn when_parse_with_4_vec_then_fail_parse_error_locators() {
+    fn when_decode_with_4_vec_then_fail_parse_error_locators() {
 
         let dump = "
 00000000   01 00 00 00                                        ver.............
@@ -189,7 +189,7 @@ mod test {
     }
 
     #[test]
-    fn when_parse_getheaders_valid_dump_then_decode_ok() {
+    fn when_decode_getheaders_valid_dump_then_decode_ok() {
 
         let dump = "
 00000000   f9 be b4 d9 67 65 74 68  65 61 64 65 72 73 00 00   main.getheaders.
@@ -231,6 +231,91 @@ mod test {
             0x30, 0x30, 0x30, 0x30, 0x31, 0x31, 0x31, 0x31, 0x32, 0x32, 0x32, 0x32, 0x33, 0x33, 0x33, 0x33,  
             0x34, 0x34, 0x34, 0x34, 0x35, 0x35, 0x35, 0x35, 0x36, 0x36, 0x36, 0x36, 0x00, 0x00, 0x00, 0x00,
         ]); 
+    }
+
+    #[test]
+    fn when_decode_encode_getheaders_then_same() {
+
+        let dump = "
+00000000                            71 11 01 00 02 10 10 10           ver.c.bl
+00000010   10 11 11 11 11 12 12 12  12 13 13 13 13 14 14 14   ock1.block1.bloc
+00000020   14 15 15 15 15 16 16 16  16 00 00 00 00 20 20 20   block1.block1..b
+00000030   20 21 21 21 21 22 22 22  22 23 23 23 23 24 24 24   lock2.block2.blo
+00000040   24 25 25 25 25 26 26 26  26 00 00 00 00 30 30 30   ck2.block2.blo.s
+00000050   30 31 31 31 31 32 32 32  32 33 33 33 33 34 34 34   top.stop.stop.st
+00000060   34 35 35 35 35 36 36 36  36 00 00 00 00            top.stop.sto
+";
+
+        let original : Vec<u8> = hexdump::parse(dump);
+        let mut c = Cursor::new(original.as_ref());
+
+        let decoded = getheaders::decode(&mut c);
+        assert!(decoded.is_ok());
+        assert_eq!(c.position() as usize, original.len());
+
+        let mut result : Vec<u8> = Vec::new();
+        let encoded = getheaders::encode(&mut result, decoded.unwrap());
+        assert!(encoded.is_ok());
+
+        assert_eq!(original, result);
+    }
+    
+    #[test]
+    fn when_encode_getheaders_then_same() {
+
+        let dump = "
+00000000                            71 11 01 00 02 10 10 10           ver.c.bl
+00000010   10 11 11 11 11 12 12 12  12 13 13 13 13 14 14 14   ock1.block1.bloc
+00000020   14 15 15 15 15 16 16 16  16 00 00 00 00 20 20 20   block1.block1..b
+00000030   20 21 21 21 21 22 22 22  22 23 23 23 23 24 24 24   lock2.block2.blo
+00000040   24 25 25 25 25 26 26 26  26 00 00 00 00 30 30 30   ck2.block2.blo.s
+00000050   30 31 31 31 31 32 32 32  32 33 33 33 33 34 34 34   top.stop.stop.st
+00000060   34 35 35 35 35 36 36 36  36 00 00 00 00            top.stop.sto
+";
+
+        let original : Vec<u8> = hexdump::parse(dump);
+        
+        let mut locators : Vec<Sha256> = Vec::new();
+        let loc1 = Sha256 {
+            hash: [
+                0x10, 0x10, 0x10, 0x10, 0x11, 0x11, 0x11, 0x11, 
+                0x12, 0x12, 0x12, 0x12, 0x13, 0x13, 0x13, 0x13, 
+                0x14, 0x14, 0x14, 0x14, 0x15, 0x15, 0x15, 0x15, 
+                0x16, 0x16, 0x16, 0x16, 0x00, 0x00, 0x00, 0x00
+            ]
+        };
+
+        let loc2 = Sha256 {
+            hash: [
+                0x20, 0x20, 0x20, 0x20, 0x21, 0x21, 0x21, 0x21, 
+                0x22, 0x22, 0x22, 0x22, 0x23, 0x23, 0x23, 0x23, 
+                0x24, 0x24, 0x24, 0x24, 0x25, 0x25, 0x25, 0x25, 
+                0x26, 0x26, 0x26, 0x26, 0x00, 0x00, 0x00, 0x00
+            ]
+        };
+        locators.push(loc1);
+        locators.push(loc2);
+
+        let stop = Sha256 {
+            hash: [
+                0x30, 0x30, 0x30, 0x30, 0x31, 0x31, 0x31, 0x31, 
+                0x32, 0x32, 0x32, 0x32, 0x33, 0x33, 0x33, 0x33, 
+                0x34, 0x34, 0x34, 0x34, 0x35, 0x35, 0x35, 0x35, 
+                0x36, 0x36, 0x36, 0x36, 0x00, 0x00, 0x00, 0x00
+            ]
+        };
+
+        let message = GetHeadersMessage {
+            version: 70001,
+            locators: locators,
+            stop: stop
+        };
+
+        let mut result : Vec<u8> = Vec::new();
+        let encoded = getheaders::encode(&mut result, message);
+        assert!(encoded.is_ok());
+
+        assert_eq!(original, result);
     }
 
 }

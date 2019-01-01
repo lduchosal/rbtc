@@ -1,7 +1,7 @@
 
-use rbtc::block::block;
-use rbtc::block::error::DecodeError;
-use rbtc::utils::hexdump;
+use crate::block::block;
+use crate::block::error::DecodeError;
+use crate::utils::hexdump;
 
 #[test]
 fn test() {

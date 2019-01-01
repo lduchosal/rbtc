@@ -1,1 +1,0 @@
-mod when_getheaders_valid_then_result_ok;
