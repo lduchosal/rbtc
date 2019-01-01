@@ -40,7 +40,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 /// |                 |  when transaction is final                   |                              | 
 /// +-----------------+----------------------------------------------+------------------------------+ 
 /// 
-pub fn parse_transaction(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, DecodeError> {
+pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, DecodeError> {
 
     let version = r.read_i32::<LittleEndian>().map_err(|_| DecodeError::TransactionVersion)?;
 
@@ -76,13 +76,13 @@ pub fn parse_transaction(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, Decode
 }
 
 
-pub(crate) fn parse_transactions(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Transaction>, DecodeError> {
+pub(crate) fn decodes(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Transaction>, DecodeError> {
 
     let mut result : Vec<Transaction> = Vec::new();
     let count = varint::decode(r).map_err(|_| DecodeError::TransactionsCount)?;
 
     for _ in 0..count {
-        let transaction = parse_transaction(r)?;
+        let transaction = decode(r)?;
         result.push(transaction);
     }
     

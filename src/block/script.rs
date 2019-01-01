@@ -6,7 +6,7 @@ use crate::primitives::script::Script;
 use std::io::Read;
 use std::io::Cursor;
 
-pub(crate) fn parse_script(r: &mut Cursor<&Vec<u8>>) -> Result<Script, DecodeError> {
+pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Script, DecodeError> {
 
     let scriptlen = varint::decode(r).map_err(|_| DecodeError::ScriptLen)?;
     let mut content = vec![0u8; scriptlen as usize];
@@ -32,11 +32,11 @@ mod test {
     use std::io::Cursor;
 
     #[test]
-    fn parse_script_0x00_then_1_byte() {
+    fn decode_0x00_then_1_byte() {
 
         let data : Vec<u8> = vec![0x00];
         let mut c = Cursor::new(data.as_ref());
-        let parsescript = script::parse_script(&mut c);
+        let parsescript = script::decode(&mut c);
         assert!(parsescript.is_ok());
         assert_eq!(c.position(), 1);
 
@@ -45,11 +45,11 @@ mod test {
     }
 
     #[test]
-    fn parse_script_0x01_then_1_byte() {
+    fn decode_0x01_then_1_byte() {
 
         let data : Vec<u8> = vec![0x01, 0x00];
         let mut c = Cursor::new(data.as_ref());
-        let parsescript = script::parse_script(&mut c);
+        let parsescript = script::decode(&mut c);
         assert!(parsescript.is_ok());
         assert_eq!(c.position(), 2);
 
@@ -58,11 +58,11 @@ mod test {
     }
 
     #[test]
-    fn parse_script_0x02_then_2_byte() {
+    fn decode_0x02_then_2_byte() {
 
         let data : Vec<u8> = vec![0x02, 0x00, 0x00];
         let mut c = Cursor::new(data.as_ref());
-        let parsescript = script::parse_script(&mut c);
+        let parsescript = script::decode(&mut c);
         assert!(parsescript.is_ok());
         assert_eq!(c.position(), 3);
 
@@ -71,11 +71,11 @@ mod test {
     }
 
     #[test]
-    fn parse_script_0x10_then_10_byte() {
+    fn decode_0x10_then_10_byte() {
 
         let data : Vec<u8> = vec![0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ];
         let mut c = Cursor::new(data.as_ref());
-        let parsescript = script::parse_script(&mut c);
+        let parsescript = script::decode(&mut c);
         assert!(parsescript.is_ok());
         assert_eq!(c.position(), 0x11);
 
@@ -85,11 +85,11 @@ mod test {
 
 
     #[test]
-    fn parse_script_invalid_size_then_fail() {
+    fn decode_invalid_size_then_fail() {
 
         let data : Vec<u8> = vec![0x01 ];
         let mut c = Cursor::new(data.as_ref());
-        let parsescript = script::parse_script(&mut c);
+        let parsescript = script::decode(&mut c);
         assert!(parsescript.is_err());
         assert_eq!(c.position(), 0x01);
 
@@ -103,11 +103,11 @@ mod test {
     }
 
     #[test]
-    fn parse_script_invalid_content_then_fail() {
+    fn decode_invalid_content_then_fail() {
 
         let data : Vec<u8> = vec![ ];
         let mut c = Cursor::new(data.as_ref());
-        let parsescript = script::parse_script(&mut c);
+        let parsescript = script::decode(&mut c);
         assert!(parsescript.is_err());
 
         if let Err(e) = parsescript {

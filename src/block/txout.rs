@@ -23,7 +23,7 @@ pub(crate) fn parse_outputs(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxOut>, Deco
 pub(crate) fn parse_output(r: &mut Cursor<&Vec<u8>>) -> Result<TxOut, DecodeError> {
 
     let amount = r.read_u64::<LittleEndian>().map_err(|_| DecodeError::TxOutAmount)?;
-    let script_pubkey = script::parse_script(r)
+    let script_pubkey = script::decode(r)
         .map_err(|e| {
             match e {
                 DecodeError::ScriptContent => DecodeError::ScriptPubKeyScriptContent,

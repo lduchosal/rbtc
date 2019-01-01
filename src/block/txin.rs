@@ -32,7 +32,7 @@ pub(crate) fn parse_input(r: &mut Cursor<&Vec<u8>>) -> Result<TxIn, DecodeError>
         index: index,
     };
 
-    let signature = script::parse_script(r)
+    let signature = script::decode(r)
         .map_err(|e| {
             match e {
                 DecodeError::ScriptContent => DecodeError::SignatureScriptContent,
