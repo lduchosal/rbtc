@@ -1,3 +1,4 @@
 pub mod getheaders;
 pub mod message;
-mod error;
+pub mod version;
+pub mod error;

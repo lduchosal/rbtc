@@ -226,4 +226,5 @@ mod test {
         assert!(encoded.is_ok());
         assert_eq!(original, result);
     }
+
 }

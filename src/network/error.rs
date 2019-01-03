@@ -12,6 +12,17 @@ pub enum DecodeError {
     GetHeadersLocators,
     GetHeadersLocator,
     GetHeadersStop,
+
+    VersionVersion,
+    VersionServices,
+    VersionTimestamp,
+    VersionReceiver,
+    VersionSender,
+    VersionNonce,
+    VersionUserAgent,
+    VersionUserAgentLen,
+    VersionStartHeight,
+    VersionRelay,
 }
 
 #[derive(PartialEq, Debug)]
@@ -27,4 +38,15 @@ pub enum EncodeError {
     GetHeadersLocators,
     GetHeadersLocator,
     GetHeadersStop,
+
+    VersionVersion,
+    VersionServices,
+    VersionTimestamp,
+    VersionReceiver,
+    VersionSender,
+    VersionNonce,
+    VersionUserAgent,
+    VersionUserAgentLen,
+    VersionStartHeight,
+    VersionRelay,
 }
