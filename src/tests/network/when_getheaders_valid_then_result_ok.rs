@@ -1,7 +1,7 @@
 
 use crate::utils::sha256::Sha256;
-use crate::message::getheaders::GetHeadersMessage;
-use crate::message::getheaders;
+use crate::network::getheaders::GetHeadersMessage;
+use crate::network::getheaders;
 use crate::utils::hexdump;
 
 use std::io::Cursor;

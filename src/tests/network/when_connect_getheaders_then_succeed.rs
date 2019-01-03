@@ -8,7 +8,10 @@ use tokio::prelude::*;
 use chrono::Local;
 
 use crate::utils::sha256::Sha256;
-use crate::message::getheaders::GetHeadersMessage;
+use crate::network::message::Encodable;
+use crate::network::message::NetworkMessage;
+use crate::network::getheaders::GetHeadersMessage;
+use crate::network::message::{Message, Magic, Command};
 
 #[test]
 fn test() {
@@ -34,46 +37,29 @@ fn test() {
     locators.push(loc1);
     locators.push(loc2);
 
-    let stop = Sha256 {
-        hash: [
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-        ]
-    };
+    let stop = Sha256 { hash: [0u8; 32] };
 
-    let message = GetHeadersMessage {
+    let getheadermessage = GetHeadersMessage {
         version: 70001,
         locators: locators,
         stop: stop
     };
 
-    let mut result : Vec<u8> = Vec::new();
-    let ok = crate::message::getheaders::encode(&mut result, message);
+    let message = Message {
+        magic: Magic::MainNet,
+        payload: &getheadermessage
+    };
+
+    let mut data : Vec<u8> = Vec::new();
+    let ok = message.encode(&mut data);
     assert!(ok.is_ok());
     
+    let arr = data.as_slice();
+
     let addr = "127.0.0.1:6142".parse().unwrap();
     
     let client  = TcpStream::connect(&addr).and_then(|stream| {
-
-        println!("created stream");
-
-        let dt = Local::now();
-        let dts = dt.format("%Y-%m-%d %H:%M:%S").to_string();
-
-        result.write_all(b"\n\r");
-        result.write_all(b"---");
-        result.write_all(b"\n\r");
-
-        result.write_all(dts.as_bytes());
-
-        result.write_all(b"\n\r");
-        result.write_all(b"---");
-        result.write_all(b"\n\r");
-
-        io::write_all(stream, result).then(|_| {
-            println!("written stream");
+        io::write_all(stream, data).then(|_| {
             Ok(())
         })
     })
@@ -87,5 +73,4 @@ fn test() {
     });
 
     tokio::run(client);
-
 }

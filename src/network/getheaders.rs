@@ -1,3 +1,6 @@
+use crate::network::message::Command;
+use crate::network::error::{EncodeError, DecodeError};
+use crate::network::message::NetworkMessage;
 use crate::utils::sha256::Sha256;
 use crate::block::varint;
 
@@ -46,47 +49,37 @@ pub struct GetHeadersMessage {
     pub stop: Sha256
 }
 
-#[derive(PartialEq, Debug)]
-pub enum DecodeError {
-    Version,
-    LocatorsCount,
-    Locators,
-    Locator,
-    Stop,
-}
+impl NetworkMessage for GetHeadersMessage {
 
-#[derive(PartialEq, Debug)]
-pub enum EncodeError {
-    Version,
-    LocatorsCount,
-    Locators,
-    Locator,
-    Stop,
-}
-
-pub fn encode(w: &mut Vec<u8>, m: GetHeadersMessage) -> Result<(), EncodeError> {
-
-    w.write_u32::<LittleEndian>(m.version).map_err(|_| EncodeError::Version)?;
-
-    varint::encode(w, m.locators.len() as u64).map_err(|_| EncodeError::LocatorsCount)?;
-    for locator in m.locators {
-        let hash = locator.hash;
-        w.write_all(&hash).map_err(|_| EncodeError::Locators)?;
+    fn command(&self) -> Command {
+        Command::GetHeaders
     }
 
-    let stop = m.stop.hash;
-    w.write_all(&stop).map_err(|_| EncodeError::Stop)?;
+    fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError> {
 
-    Ok(())
+        w.write_u32::<LittleEndian>(self.version).map_err(|_| EncodeError::GetHeadersVersion)?;
+
+        varint::encode(w, self.locators.len() as u64).map_err(|_| EncodeError::GetHeadersLocatorsCount)?;
+        for locator in &self.locators {
+            let hash = locator.hash;
+            w.write_all(&hash).map_err(|_| EncodeError::GetHeadersLocators)?;
+        }
+
+        let stop = self.stop.hash;
+        w.write_all(&stop).map_err(|_| EncodeError::GetHeadersStop)?;
+
+        Ok(())
+    }
 }
+
 
 pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<GetHeadersMessage, DecodeError> {
 
-    let version = r.read_u32::<LittleEndian>().map_err(|_| DecodeError::Version)?;
-    let locators : Vec<Sha256> = decode_locators(r).map_err(|_| DecodeError::Locators)?;
+    let version = r.read_u32::<LittleEndian>().map_err(|_| DecodeError::GetHeadersVersion)?;
+    let locators : Vec<Sha256> = decode_locators(r).map_err(|_| DecodeError::GetHeadersLocators)?;
 
     let mut hash = [0; 32];
-    r.read_exact(&mut hash).map_err(|_| DecodeError::Stop)?;
+    r.read_exact(&mut hash).map_err(|_| DecodeError::GetHeadersStop)?;
     let stop = Sha256 {
         hash: hash
     };
@@ -103,11 +96,11 @@ pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<GetHeadersMessage, DecodeError
 fn decode_locators(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Sha256>, DecodeError> {
 
     let mut result : Vec<Sha256> = Vec::new();
-    let count = varint::decode(r).map_err(|_| DecodeError::LocatorsCount)?;
+    let count = varint::decode(r).map_err(|_| DecodeError::GetHeadersLocatorsCount)?;
 
     for _ in 0..count {
         let mut hash = [0; 32];
-        r.read_exact(&mut hash).map_err(|_| DecodeError::Locator)?;
+        r.read_exact(&mut hash).map_err(|_| DecodeError::GetHeadersLocator)?;
         let locator = Sha256 {
             hash: hash
         };
@@ -120,9 +113,10 @@ fn decode_locators(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Sha256>, DecodeError>
 #[cfg(test)]
 mod test {
 
-    use crate::message::getheaders;
-    use crate::message::getheaders::GetHeadersMessage;
-    use crate::message::getheaders::DecodeError;
+    use crate::network::message::NetworkMessage;
+    use crate::network::getheaders;
+    use crate::network::getheaders::GetHeadersMessage;
+    use crate::network::getheaders::DecodeError;
     use crate::utils::hexdump;
     use crate::utils::sha256::Sha256;
 
@@ -142,7 +136,7 @@ mod test {
         assert_eq!(c.position(), 0);
 
         if let Err(e) = result {
-            assert_eq!(e, DecodeError::Version);
+            assert_eq!(e, DecodeError::GetHeadersVersion);
         } else {
             panic!("should have failed");
         }
@@ -162,7 +156,7 @@ mod test {
         assert_eq!(c.position(), 0);
 
         if let Err(e) = result {
-            assert_eq!(e, DecodeError::Version);
+            assert_eq!(e, DecodeError::GetHeadersVersion);
         } else {
             panic!("should have failed");
         }
@@ -182,7 +176,7 @@ mod test {
         assert_eq!(c.position(), 4);
 
         if let Err(e) = result {
-            assert_eq!(e, DecodeError::Locators);
+            assert_eq!(e, DecodeError::GetHeadersLocators);
         } else {
             panic!("should have failed");
         }
@@ -254,7 +248,7 @@ mod test {
         assert_eq!(c.position() as usize, original.len());
 
         let mut result : Vec<u8> = Vec::new();
-        let encoded = getheaders::encode(&mut result, decoded.unwrap());
+        let encoded = decoded.unwrap().encode(&mut result);
         assert!(encoded.is_ok());
 
         assert_eq!(original, result);
@@ -312,7 +306,7 @@ mod test {
         };
 
         let mut result : Vec<u8> = Vec::new();
-        let encoded = getheaders::encode(&mut result, message);
+        let encoded = message.encode(&mut result);
         assert!(encoded.is_ok());
 
         assert_eq!(original, result);
