@@ -22,9 +22,28 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 /// +-----------+-------------+-------------------+
 #[derive(Debug, Clone)]
 pub enum Magic {
-    MainNet = 0xD9B4BEF9,
-    TestNet = 0x0709110B,
-    RegTest = 0xDAB5BFFA
+    MainNet,
+    TestNet,
+    RegTest,
+}
+
+impl Magic {
+    fn value(&self) -> &[u8; 4] {
+        match *self {
+            Magic::MainNet => &[ 0xD9, 0xB4, 0xBE, 0xF9 ],
+            Magic::TestNet => &[ 0x07, 0x09, 0x11, 0x0B ],
+            Magic::RegTest => &[ 0xDA, 0xB5, 0xBF, 0xFA ],
+        }
+    }
+}
+
+impl Encodable for Magic {
+    fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError> {
+        let mut wire = self.value().clone();
+        wire.reverse();
+        w.write_all(&wire).map_err(|_| EncodeError::MessageMagic)?;
+        Ok(())
+    }
 }
 
 /// https://en.bitcoin.it/wiki/Protocol_documentation
@@ -58,9 +77,8 @@ pub struct Message<'a> {
     pub payload: &'a NetworkMessage
 }
 
-pub trait NetworkMessage {
+pub trait NetworkMessage : Encodable {
     fn command(&self) -> Command;
-    fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError>;
 }
 
 pub trait Encodable {
@@ -111,8 +129,7 @@ impl<'a> crate::network::message::Encodable for Message<'a> {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError> {
 
-        let magic = self.magic.clone() as u32;
-        w.write_u32::<LittleEndian>(magic).map_err(|_| EncodeError::MessageMagic)?;
+        self.magic.encode(w)?;
         
         let mut command = format!("{:?}\0\0\0\0\0\0\0\0\0\0\0\0", 
             self.payload.command())
@@ -155,19 +172,21 @@ mod test {
     use crate::network::message::Command;
     use crate::network::message::Message;
     use crate::network::message::EncodeError;
-    use crate::network::message::Encodable;
-    use crate::network::message::NetworkMessage;
+    use crate::network::message::{NetworkMessage, Encodable};
     use crate::utils::hexdump;
 
-    struct NetworkMessageTest {
+    struct NetworkMessageMock {
         text: Vec<u8>
     }
 
-    impl NetworkMessage for NetworkMessageTest {
+    impl NetworkMessage for NetworkMessageMock {
 
         fn command(&self) -> Command {
             Command::GetHeaders
         }
+    }
+
+    impl Encodable for NetworkMessageMock {
 
         fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError> {
             w.append(&mut self.text.clone());
@@ -185,7 +204,7 @@ mod test {
 
         let original : Vec<u8> = hexdump::parse(dump);
         
-        let payload = NetworkMessageTest {
+        let payload = NetworkMessageMock {
             text: Vec::new()
         };
 
@@ -211,7 +230,7 @@ mod test {
 
         let original : Vec<u8> = hexdump::parse(dump);
         
-        let payload = NetworkMessageTest {
+        let payload = NetworkMessageMock {
             text: vec![0x00, 0x01, 0x02, 0x03]
         };
 

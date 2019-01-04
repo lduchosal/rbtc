@@ -1,0 +1,14 @@
+[package]
+name = "rbtc"
+version = "0.2.0"
+authors = ["q"]
+edition = "2018"
+
+[dependencies]
+pretty_assertions = "0.5"
+regex = "1.1"
+hex = "0.3"
+byteorder = "1.2"
+tokio = "0.1"
+chrono = "0.4"
+sha2 = "0.8"

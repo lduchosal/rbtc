@@ -23,6 +23,14 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug program 'rbtc_nodewalker'",
+            "program": "${workspaceRoot}/target/debug/rbtc_nodewalker",
+            "args": [],
+            "cwd": "${workspaceFolder}/target/debug/"
         }
     ]
 }

@@ -28,6 +28,7 @@ pub enum DecodeError {
 #[derive(PartialEq, Debug)]
 pub enum EncodeError {
     MessageMagic,
+    MessageMagicReverse,
     MessageCommand,
     MessagePayLoadLen,
     MessagePayLoad,

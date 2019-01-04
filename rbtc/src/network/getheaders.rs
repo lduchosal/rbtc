@@ -1,6 +1,6 @@
 use crate::network::message::Command;
 use crate::network::error::{EncodeError, DecodeError};
-use crate::network::message::NetworkMessage;
+use crate::network::message::{NetworkMessage, Encodable};
 use crate::utils::sha256::Sha256;
 use crate::block::varint;
 
@@ -54,6 +54,9 @@ impl NetworkMessage for GetHeadersMessage {
     fn command(&self) -> Command {
         Command::GetHeaders
     }
+}
+
+impl Encodable for GetHeadersMessage {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError> {
 
@@ -71,7 +74,6 @@ impl NetworkMessage for GetHeadersMessage {
         Ok(())
     }
 }
-
 
 pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<GetHeadersMessage, DecodeError> {
 
@@ -113,7 +115,7 @@ fn decode_locators(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Sha256>, DecodeError>
 #[cfg(test)]
 mod test {
 
-    use crate::network::message::NetworkMessage;
+    use crate::network::message::Encodable;
     use crate::network::getheaders;
     use crate::network::getheaders::GetHeadersMessage;
     use crate::network::getheaders::DecodeError;

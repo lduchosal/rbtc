@@ -1,4 +1,4 @@
-use crate::network::message::NetworkMessage;
+use crate::network::message::{NetworkMessage, Encodable};
 use crate::network::error::EncodeError;
 use crate::network::message::Command;
 
@@ -79,7 +79,10 @@ impl NetworkMessage for Version {
     fn command(&self) -> Command {
         Command::Version
     }
-    
+}
+
+impl Encodable for Version {
+
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError> {
 
         w.write_i32::<LittleEndian>(self.version).map_err(|_| EncodeError::VersionVersion)?;

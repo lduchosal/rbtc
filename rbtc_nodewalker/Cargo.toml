@@ -1,0 +1,13 @@
+[package]
+name = "rbtc_nodewalker"
+version = "0.2.0"
+authors = ["q"]
+edition = "2018"
+
+[dependencies]
+dns-lookup = "1.0.0"
+time = "0.1.41"
+
+[dependencies.rusqlite]
+version = "0.16.0"
+features = ["bundled"]
