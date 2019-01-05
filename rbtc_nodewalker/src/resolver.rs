@@ -5,23 +5,23 @@ use dns_lookup::{lookup_host};
 use std::net::IpAddr;
 use std::collections::HashSet;
 
-pub struct Resolver<'a> {
-    config: &'a Config,    
+pub struct Resolver {
+    dns_seeds: Vec<String>,    
 }
 
-impl<'a> Resolver<'a> {
+impl Resolver {
 
-    pub fn new(config: &Config) -> Resolver {
+    pub fn new(dns_seeds: Vec<String>) -> Resolver {
         Resolver { 
-            config: config,
+            dns_seeds: dns_seeds,
         }
     }
 
     pub fn ips(&self) -> HashSet<IpAddr> {
 
         let mut result : HashSet<IpAddr> = HashSet::new();
-        let seeds = &self.config.dns_seeds;
-        for seed in seeds {
+        let dns_seeds = &self.dns_seeds;
+        for seed in dns_seeds {
             let oips = lookup_host(&seed);
 
             if let Ok(ips) = oips {

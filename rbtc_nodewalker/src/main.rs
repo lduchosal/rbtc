@@ -1,6 +1,9 @@
 pub mod config;
 pub mod resolver;
+pub mod provider;
 pub mod node;
+pub mod walker;
+pub mod program;
 
 use std::path::Path;
 
@@ -10,35 +13,25 @@ fn main() {
 
     let config = config::Config {
         dns_seeds: vec![
-            "seed.bitcoin.sipa.be",
-            "dnsseed.bluematt.me",
-            "dnsseed.bitcoin.dashjr.org",
-            "seed.bitcoinstats.com",
-            "seed.bitcoin.jonasschnelli.ch",
-            "seed.btc.petertodd.org",
-            "seed.bitcoin.sprovoost.nl",
+            String::from("seed.bitcoin.sipa.be"),
+            String::from("dnsseed.bluematt.me"),
+            String::from("dnsseed.bitcoin.dashjr.org"),
+            String::from("seed.bitcoinstats.com"),
+            String::from("seed.bitcoin.jonasschnelli.ch"),
+            String::from("seed.btc.petertodd.org"),
+            String::from("seed.bitcoin.sprovoost.nl"),
         ],
         sqlite_path: Path::new("./nodes.sqlite"),
     };
 
-    let resolver = resolver::Resolver::new(&config);
-    let provider = node::NodeProvider::new(&config.sqlite_path).unwrap();
+    let resolver = resolver::Resolver::new(config.dns_seeds);
+    let provider = provider::NodeProvider::new(&config.sqlite_path).unwrap();
+    let walker = walker::NodeWalker::new();
 
-    
-    let ips = resolver.ips()
-        .into_iter()
-        .map(|ip| ip.to_string())
-        .collect()
-        ;
-
-    let src = String::from("dnsseed");
-
-    provider.bulkinsert(ips, src);
-
-    let nodes = provider.all().unwrap();
-    
-    for node in nodes {
-        println!("{} {} {}", node.id, node.ip, node.src);
-    }
-
+    let program = program::Program::new(
+        resolver,
+        provider,
+        walker
+    );
+    program.run();
 }
