@@ -9,7 +9,6 @@ use chrono::Local;
 
 use crate::utils::sha256::Sha256;
 use crate::network::message::Encodable;
-use crate::network::message::NetworkMessage;
 use crate::network::getheaders::GetHeadersMessage;
 use crate::network::message::{Message, Magic, Command};
 
@@ -54,8 +53,6 @@ fn test() {
     let ok = message.encode(&mut data);
     assert!(ok.is_ok());
     
-    let arr = data.as_slice();
-
     let addr = "127.0.0.1:6142".parse().unwrap();
     
     let client  = TcpStream::connect(&addr).and_then(|stream| {

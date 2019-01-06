@@ -55,7 +55,6 @@ pub struct Version {
 /// The following services are currently assigned:
 /// https://en.bitcoin.it/wiki/Protocol_documentation#version
 /// 
-/// ```
 /// +-------+----------------------+-----------------------------------------------------------------+
 /// | Value | Name                 | Description                                                     |
 /// +-------+----------------------+-----------------------------------------------------------------+
@@ -65,7 +64,7 @@ pub struct Version {
 /// |    8  | NODE_WITNESS         | See BIP 0144                                                    | 
 /// | 1024  | NODE_NETWORK_LIMITED | See BIP 0159                                                    |
 /// +-------+----------------------+-----------------------------------------------------------------+
-/// ```
+/// 
 #[derive(Debug, Clone)]
 pub enum Service {
     Network = 1,
@@ -125,9 +124,8 @@ mod test {
 
      #[test]
     fn version_message_test() {
-
         let dump = "
-00000000   72 11 01 00 01 00 00 00  00 00 00 00 e6 e0 84 53   ................
+00000000   72 11 01 00 01 00 00 00  00 00 00 00 e6 e0 84 53   ver.service.time
 00000000   00 00 00 00 01 00 00 00  00 00 00 00 00 00 00 00   ................
 00000000   00 00 00 00 00 00 ff ff  00 00 00 00 00 00 01 00   ................
 00000000   00 00 00 00 00 00 fd 87  d8 7e eb 43 64 f2 2c f5   ................
@@ -139,24 +137,22 @@ mod test {
         // This message is from a satoshi node, morning of May 27 2014
         let original : Vec<u8> = hexdump::parse(dump);
 
-        let service = Service::Network;
-        let ip_receiver = IpAddr::V4("0.0.0.0".parse().unwrap());
         let version = Version {
             version: 70002,
-            services: service.clone(),
-            timestamp: 0,
+            services: Service::Network,
+            timestamp: 1401217254,
             receiver: NetworkAddr {
                 time: None,
-                services: service.clone(),
-                ip: ip_receiver,
+                services: Service::Network,
+                ip: IpAddr::V4("0.0.0.0".parse().unwrap()),
                 port: 0
             },
             //[ 1, 0, 0, 0, 0, 0, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ],
             sender: NetworkAddr {
                 time: None,
-                services: service,
-                ip: ip_receiver,
-                port: 0
+                services: Service::Network,
+                ip: IpAddr::V6("fd87:d87e:eb43:64f2:2cf5:4dca:5941:2db7".parse().unwrap()),
+                port: 8333
             },
             // [ 1, 0, 0, 0, 0, 0, 0, 0, 0xfd, 0x87, 0xd8, 0x7e, 0xeb, 0x43, 0x64, 0xf2, 0x2c, 0xf5, 0x4d, 0xca, 0x59, 0x41, 0x2d, 0xb7, 0x20, 0x8d ],
             nonce: 0xE83EE8FCCF20D947,
