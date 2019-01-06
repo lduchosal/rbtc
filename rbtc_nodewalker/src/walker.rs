@@ -1,11 +1,12 @@
+extern crate chrono;
+
 use rbtc::network::networkaddr::NetworkAddr;
 use rbtc::network::version::Version;
 use rbtc::network::version::Service;
 use rbtc::network::message::{Encodable, Message, Magic};
 
-use std::net::{Shutdown, TcpStream, IpAddr, SocketAddr};
+use std::net::{TcpStream, IpAddr, SocketAddr};
 use std::io::prelude::*;
-use std::time;
 use std::fmt;
 
 #[derive(Debug)]
@@ -60,7 +61,7 @@ impl NodeWalker {
         let read = stream.read(buffer).map_err(|_| NodeWalkerError::Read)?;
         response.truncate(read);
 
-        stream.shutdown(Shutdown::Both).map_err(|_| NodeWalkerError::Shutdown)?;
+        // stream.shutdown(Shutdown::Both).map_err(|_| NodeWalkerError::Shutdown)?;
         let ss = std::str::from_utf8(&response.as_slice()).unwrap();
 
         let mut result : Vec<String> = Vec::new();
@@ -70,10 +71,12 @@ impl NodeWalker {
 
     fn payload(&self) -> Version {
 
+        let now = chrono::Local::now();
+
         Version {
             version: 70002,
             services: Service::Network,
-            timestamp: 1401217254,
+            timestamp: now.timestamp(),
             receiver: NetworkAddr {
                 time: None,
                 services: Service::Network,
@@ -83,8 +86,8 @@ impl NodeWalker {
             sender: NetworkAddr {
                 time: None,
                 services: Service::Network,
-                ip: IpAddr::V6("FD87:D87E:EB43:64F2:2CF5:4DCA:5941:2DB7".parse().unwrap()),
-                port: 8333
+                ip: IpAddr::V4("0.0.0.0".parse().unwrap()),
+                port: 0
             },
             nonce: 0xE83EE8FCCF20D947,
             user_agent: "/rbtc:0.2.0/".to_string(),
@@ -95,9 +98,9 @@ impl NodeWalker {
 
     fn connect(&self, addr: &SocketAddr) -> Result<TcpStream, NodeWalkerError> {
 
-        let connect_timeout = time::Duration::from_secs(3);
-        let read_timeout = time::Duration::from_secs(10);
-        let write_timeout = time::Duration::from_secs(5);
+        let connect_timeout = std::time::Duration::from_secs(3);
+        let read_timeout = std::time::Duration::from_secs(10);
+        let write_timeout = std::time::Duration::from_secs(5);
 
         let stream = TcpStream::connect_timeout(addr, connect_timeout).map_err(|_| NodeWalkerError::Connect)?;
         stream.set_read_timeout(Option::Some(read_timeout)).map_err(|_| NodeWalkerError::ReadTimeout)?;

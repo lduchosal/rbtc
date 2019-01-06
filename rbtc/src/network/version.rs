@@ -147,14 +147,12 @@ mod test {
                 ip: IpAddr::V4("0.0.0.0".parse().unwrap()),
                 port: 0
             },
-            //[ 1, 0, 0, 0, 0, 0, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ],
             sender: NetworkAddr {
                 time: None,
                 services: Service::Network,
                 ip: IpAddr::V6("fd87:d87e:eb43:64f2:2cf5:4dca:5941:2db7".parse().unwrap()),
                 port: 8333
             },
-            // [ 1, 0, 0, 0, 0, 0, 0, 0, 0xfd, 0x87, 0xd8, 0x7e, 0xeb, 0x43, 0x64, 0xf2, 0x2c, 0xf5, 0x4d, 0xca, 0x59, 0x41, 0x2d, 0xb7, 0x20, 0x8d ],
             nonce: 0xE83EE8FCCF20D947,
             user_agent: "/Satoshi:0.9.99/".to_string(),
             start_height: 0x00049F2C,

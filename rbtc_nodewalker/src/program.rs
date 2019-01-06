@@ -55,7 +55,7 @@ impl Program {
             println!("{} {} {}", node.id, node.src, node.ip);
         }
 
-        let now = chrono::Utc::now();
+        let now = chrono::Local::now();
         println!("------------------------------", );
         println!("{}", now.to_string());
         println!("------------------------------", );

@@ -63,7 +63,7 @@ impl NodeProvider {
             &[ 
                 &n.ip as &ToSql, 
                 &n.src as &ToSql, 
-                &n.creation 
+                &n.creation
             ],
             )
             .map_err(|_| ProviderError::Insert)
@@ -71,12 +71,13 @@ impl NodeProvider {
 
     pub fn bulkinsert(&self, ips: Vec<String>, src: &String) -> Result<(), ProviderError> {
         
+        let now = chrono::Local::now();
         for ip in ips {
             let node = Node {
                 id: 0,
                 ip: ip,
                 src: src.clone(),
-                creation: time::get_time(),
+                creation: now.timestamp(),
             };
             self.insert(&node).map_err(|_| ProviderError::InsertIterator)?;
         }

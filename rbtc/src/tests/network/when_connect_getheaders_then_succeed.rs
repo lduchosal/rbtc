@@ -1,11 +1,8 @@
 extern crate tokio;
-extern crate chrono;
 
 use tokio::io;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
-
-use chrono::Local;
 
 use crate::utils::sha256::Sha256;
 use crate::network::message::Encodable;

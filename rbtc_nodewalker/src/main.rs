@@ -1,3 +1,5 @@
+extern crate chrono;
+
 pub mod config;
 pub mod resolver;
 pub mod provider;
