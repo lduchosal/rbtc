@@ -95,7 +95,7 @@ mod test {
 ";
 
         // This message is from a satoshi node, morning of May 27 2014
-        let original : Vec<u8> = hexdump::parse(dump);
+        let original : Vec<u8> = hexdump::decode(dump);
         let ip = IpAddr::V4("10.0.0.1".parse().unwrap());
         let port = 8333;
         let service = Service::Network;
@@ -123,7 +123,7 @@ mod test {
 00000010   00 00 FF FF 00 00 00 00  00 00                     ..........
 ";
 
-        let original : Vec<u8> = hexdump::parse(dump);
+        let original : Vec<u8> = hexdump::decode(dump);
         let ip = IpAddr::V4("0.0.0.0".parse().unwrap());
         let port = 0;
         let service = Service::Network;
@@ -151,7 +151,7 @@ mod test {
 00000010   2C F5 4D CA 59 41 2D B7  20 8D                     ..........
 ";
 
-        let original : Vec<u8> = hexdump::parse(dump);
+        let original : Vec<u8> = hexdump::decode(dump);
         let ip = IpAddr::V6("FD87:D87E:EB43:64F2:2CF5:4DCA:5941:2DB7".parse().unwrap());
         let port = 8333;
         let service = Service::Network;

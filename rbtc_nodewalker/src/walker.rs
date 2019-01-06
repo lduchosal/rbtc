@@ -5,9 +5,12 @@ use rbtc::network::version::Version;
 use rbtc::network::version::Service;
 use rbtc::network::message::{Encodable, Message, Magic};
 
+use rbtc::utils::hexdump;
+
 use std::net::{TcpStream, IpAddr, SocketAddr};
 use std::io::prelude::*;
 use std::fmt;
+use std::io::{Error, ErrorKind};
 
 #[derive(Debug)]
 pub enum NodeWalkerError {
@@ -52,20 +55,42 @@ impl NodeWalker {
         };
         let mut request : Vec<u8> = Vec::new();
         message.encode(&mut request).map_err(|_| NodeWalkerError::Encode)?;
+        let _content = request.as_slice();
 
         let mut stream = self.connect(&addr)?;
         stream.write(&request).map_err(|_| NodeWalkerError::Write)?;
 
-        let mut response : Vec<u8> = Vec::with_capacity(2048);
-        let buffer = response.as_mut_slice();
-        let read = stream.read(buffer).map_err(|_| NodeWalkerError::Read)?;
-        response.truncate(read);
+        let mut response : Vec<u8> = Vec::new();
+        let mut buffer = [0u8; 2048];
+
+        loop {
+            let mut read : usize = 0;
+            match stream.read(&mut buffer) {
+                Ok(bytes) => read = bytes,
+                Err(err) => {
+                    println!("Err: {:?}", err);
+                    match err.kind() {
+                        ErrorKind::WouldBlock => break,
+                        _ => {}
+                    };
+                }
+            };
+
+            let mut temp = buffer.to_vec();
+            temp.truncate(read);
+            response.append(&mut temp);
+            if read < buffer.len()
+                && response.len() > 200 {
+                break;
+            }
+        }
 
         // stream.shutdown(Shutdown::Both).map_err(|_| NodeWalkerError::Shutdown)?;
-        let ss = std::str::from_utf8(&response.as_slice()).unwrap();
-
+        let encoded  = hexdump::encode(response);
         let mut result : Vec<String> = Vec::new();
-        result.push(ss.to_string());
+        for line in encoded.lines() {
+            result.push(line.to_string());
+        }
         Ok(result)
     }
 
@@ -90,7 +115,7 @@ impl NodeWalker {
                 port: 0
             },
             nonce: 0xE83EE8FCCF20D947,
-            user_agent: "/rbtc:0.2.0/".to_string(),
+            user_agent: "/Satoshi:0.17.0.1/".to_string(),
             start_height: 0x00049F2C,
             relay: true,
         }
@@ -127,6 +152,8 @@ mod test {
         for line in result.unwrap() {
             println!("{}", line);
         }
+
+        
     }
 
     #[test]

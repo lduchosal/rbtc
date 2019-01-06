@@ -21,7 +21,7 @@ fn test() {
 ";
 
 
-    let data : Vec<u8> = hexdump::parse(dump);
+    let data : Vec<u8> = hexdump::decode(dump);
     let mut c = Cursor::new(data.as_ref());
     c.set_position(24); // move beyond network protocol headers
     let result = getheaders::decode(&mut c);

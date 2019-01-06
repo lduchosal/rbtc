@@ -84,7 +84,7 @@ mod test {
 00000000                                                      ................
 ";
 
-        let data : Vec<u8> = hexdump::parse(dump);
+        let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
         let block = block::decode(&mut c);
         assert!(block.is_err());
@@ -104,7 +104,7 @@ mod test {
 00000000   01                                                 ................
 ";
 
-        let data : Vec<u8> = hexdump::parse(dump);
+        let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
         let block = block::decode(&mut c);
         assert!(block.is_err());
@@ -125,7 +125,7 @@ mod test {
 00000000   01 00 00 00                                        ver.............
 ";
 
-        let data : Vec<u8> = hexdump::parse(dump);
+        let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
         let block = block::decode(&mut c);
         assert!(block.is_err());
@@ -148,7 +148,7 @@ mod test {
 00000020   00 00 00 00                                        rev.............
 ";
 
-        let data : Vec<u8> = hexdump::parse(dump);
+        let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
         let block = block::decode(&mut c);
         assert!(block.is_err());
@@ -172,7 +172,7 @@ mod test {
 00000040   00 00 00 00                                        roo.............
 ";
 
-        let data : Vec<u8> = hexdump::parse(dump);
+        let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
         let block = block::decode(&mut c);
         assert!(block.is_err());
@@ -197,7 +197,7 @@ mod test {
 00000040   00 00 00 00 00 00 00 00                            roo.time........
 ";
 
-        let data : Vec<u8> = hexdump::parse(dump);
+        let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
         let block = block::decode(&mut c);
         assert!(block.is_err());
@@ -221,7 +221,7 @@ mod test {
 00000040   00 00 00 00 00 00 00 00  00 00 00 00               roo.time.bits...
 ";
 
-        let data : Vec<u8> = hexdump::parse(dump);
+        let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
         let block = block::decode(&mut c);
         assert!(block.is_err());
@@ -246,7 +246,7 @@ mod test {
 00000040   00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00   roo.time.bit.non
 ";
 
-        let data : Vec<u8> = hexdump::parse(dump);
+        let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
         let block = block::decode(&mut c);
         assert!(block.is_err());
@@ -271,7 +271,7 @@ mod test {
 00000050   00                                                 t...............
 ";
 
-        let data : Vec<u8> = hexdump::parse(dump);
+        let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
         let block = block::decode(&mut c);
         assert!(block.is_ok());
@@ -302,7 +302,7 @@ mod test {
 00000050   00                                                 t...............
 ";
 
-        let data : Vec<u8> = hexdump::parse(dump);
+        let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
         let block = block::decode(&mut c);
         assert!(block.is_ok());

@@ -131,7 +131,7 @@ mod test {
 00000000                                                      ................
 ";
 
-        let data : Vec<u8> = hexdump::parse(dump);
+        let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
         let result = getheaders::decode(&mut c);
         assert!(result.is_err());
@@ -151,7 +151,7 @@ mod test {
 00000000   01                                                 ................
 ";
 
-        let data : Vec<u8> = hexdump::parse(dump);
+        let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
         let result = getheaders::decode(&mut c);
         assert!(result.is_err());
@@ -171,7 +171,7 @@ mod test {
 00000000   01 00 00 00                                        ver.............
 ";
 
-        let data : Vec<u8> = hexdump::parse(dump);
+        let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
         let result = getheaders::decode(&mut c);
         assert!(result.is_err());
@@ -198,7 +198,7 @@ mod test {
 00000070   34 35 35 35 35 36 36 36  36 00 00 00 00            top.stop.sto
 ";
 
-        let data : Vec<u8> = hexdump::parse(dump);
+        let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
         c.set_position(24); // move beyond network protocol headers
 
@@ -242,7 +242,7 @@ mod test {
 00000060   34 35 35 35 35 36 36 36  36 00 00 00 00            top.stop.sto
 ";
 
-        let original : Vec<u8> = hexdump::parse(dump);
+        let original : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(original.as_ref());
 
         let decoded = getheaders::decode(&mut c);
@@ -269,7 +269,7 @@ mod test {
 00000060   34 35 35 35 35 36 36 36  36 00 00 00 00            top.stop.sto
 ";
 
-        let original : Vec<u8> = hexdump::parse(dump);
+        let original : Vec<u8> = hexdump::decode(dump);
         
         let mut locators : Vec<Sha256> = Vec::new();
         let loc1 = Sha256 {

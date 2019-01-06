@@ -203,7 +203,7 @@ mod test {
 00000010   00 00 00 00 5D F6 E0 E2                            len.checksum....
 ";
 
-        let original : Vec<u8> = hexdump::parse(dump);
+        let original : Vec<u8> = hexdump::decode(dump);
         
         let payload = NetworkMessageMock {
             text: Vec::new()
@@ -229,7 +229,7 @@ mod test {
 00000010   04 00 00 00 F7 A3 55 C0 00 01 02  03               len.checksu.data
 ";
 
-        let original : Vec<u8> = hexdump::parse(dump);
+        let original : Vec<u8> = hexdump::decode(dump);
         
         let payload = NetworkMessageMock {
             text: vec![0x00, 0x01, 0x02, 0x03]
@@ -255,7 +255,7 @@ mod test {
 00000000   F9 BE B4 D9 67 65 74 61  64 64 72 00 00 00 00 00   main.getaddr....
 00000010   00 00 00 00 5D F6 E0 E2                            len.checksu.data
 ";
-        let original : Vec<u8> = hexdump::parse(dump);
+        let original : Vec<u8> = hexdump::decode(dump);
         
         let payload = GetAddr { };
 

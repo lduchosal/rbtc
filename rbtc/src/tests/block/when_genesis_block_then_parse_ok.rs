@@ -30,7 +30,7 @@ fn test() {
 ";
 
 
-    let hex : Vec<u8> = hexdump::parse(dump);
+    let hex : Vec<u8> = hexdump::decode(dump);
 
     assert_eq!(hex.len(), 285);
 

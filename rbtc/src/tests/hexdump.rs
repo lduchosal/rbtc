@@ -21,6 +21,6 @@ fn when_genesis_block_then_len_285() {
 00000110   8A 4C 70 2B 6B F1 1D 5F  AC 00 00 00 00            ŠLp+kñ._¬....
 ";
 
-    let hgenesis : Vec<u8> = crate::utils::hexdump::parse(genesis);
+    let hgenesis : Vec<u8> = crate::utils::hexdump::decode(genesis);
     assert_eq!(hgenesis.len(), 285);
 }

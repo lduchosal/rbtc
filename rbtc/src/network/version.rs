@@ -135,7 +135,7 @@ mod test {
 ";
 
         // This message is from a satoshi node, morning of May 27 2014
-        let original : Vec<u8> = hexdump::parse(dump);
+        let original : Vec<u8> = hexdump::decode(dump);
 
         let version = Version {
             version: 70002,

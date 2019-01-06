@@ -51,7 +51,7 @@ fn test() {
 00000000   00 00 00                                           ...
 ";
 
-    let hex: Vec<u8> = hexdump::parse(dump);
+    let hex: Vec<u8> = hexdump::decode(dump);
 
     assert_eq!(hex.len(), 643);
 
