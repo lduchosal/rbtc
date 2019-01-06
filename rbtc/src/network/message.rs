@@ -1,11 +1,9 @@
-use crate::network::error::{DecodeError, EncodeError};
-
+use crate::network::error::{EncodeError};
 use sha2::{Sha256, Digest};
 
 use std::fmt;
-use std::io::{Read, Write};
-use std::io::Cursor;
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use std::io::{Write};
+use byteorder::{LittleEndian, WriteBytesExt};
 
 /// https://en.bitcoin.it/wiki/Protocol_documentation <br/>
 /// Known magic values:
@@ -140,7 +138,7 @@ impl<'a> crate::network::message::Encodable for Message<'a> {
         
         let mut payload : Vec<u8> = Vec::new();
         self.payload.encode(&mut payload)?;
-        w.write_u8(payload.len() as u8).map_err(|_| EncodeError::MessagePayLoadLen)?;
+        w.write_u32::<LittleEndian>(payload.len() as u32).map_err(|_| EncodeError::MessagePayLoadLen)?;
 
         let checksum : [u8; 4] = checksum(&payload).map_err(|_| EncodeError::MessageChecksum)?;
         w.write_all(&checksum).map_err(|_| EncodeError::MessageChecksum)?;
@@ -173,6 +171,9 @@ mod test {
     use crate::network::message::Message;
     use crate::network::message::EncodeError;
     use crate::network::message::{NetworkMessage, Encodable};
+    
+    use crate::network::getaddr::GetAddr;
+
     use crate::utils::hexdump;
 
     struct NetworkMessageMock {
@@ -199,7 +200,7 @@ mod test {
 
         let dump = "
 00000000   F9 BE B4 D9 67 65 74 68  65 61 64 65 72 73 00 00   main.getheaders.
-00000010   00 5D F6 E0 E2                                     len.checksum....
+00000010   00 00 00 00 5D F6 E0 E2                            len.checksum....
 ";
 
         let original : Vec<u8> = hexdump::parse(dump);
@@ -225,7 +226,7 @@ mod test {
 
         let dump = "
 00000000   F9 BE B4 D9 67 65 74 68  65 61 64 65 72 73 00 00   main.getheaders.
-00000010   04 F7 A3 55 C0 00 01 02  03                        len.checksu.data
+00000010   04 00 00 00 F7 A3 55 C0 00 01 02  03               len.checksu.data
 ";
 
         let original : Vec<u8> = hexdump::parse(dump);
@@ -233,6 +234,30 @@ mod test {
         let payload = NetworkMessageMock {
             text: vec![0x00, 0x01, 0x02, 0x03]
         };
+
+        let message = Message {
+            magic: Magic::MainNet,
+            payload: &payload
+        };
+
+        let mut result : Vec<u8> = Vec::new();
+        let encoded = message.encode(&mut result);
+
+        assert!(encoded.is_ok());
+        assert_eq!(original, result);
+    }
+
+
+    #[test]
+    fn when_encode_getaddr_message_then_same() {
+
+        let dump = "
+00000000   F9 BE B4 D9 67 65 74 61  64 64 72 00 00 00 00 00   main.getaddr....
+00000010   00 00 00 00 5D F6 E0 E2                            len.checksu.data
+";
+        let original : Vec<u8> = hexdump::parse(dump);
+        
+        let payload = GetAddr { };
 
         let message = Message {
             magic: Magic::MainNet,

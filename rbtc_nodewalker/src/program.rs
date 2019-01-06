@@ -25,7 +25,7 @@ impl Program {
     }
 
     pub fn run(&self) {
-        while true {
+        loop {
             self.seed();
             self.report();
             self.walk();
@@ -67,8 +67,19 @@ impl Program {
         let nodes = self.provider.all().unwrap();
         for node in nodes {
             let src = node.ip;
-            let ips = self.walker.walk(&src);
-            self.provider.bulkinsert(ips, &src).unwrap();
+            let walked = self.walker.walk(&src);
+            if let Err(err) = walked {
+                println!("NodeWalker failed with : {}", err);
+                continue;
+            }
+
+            let ips = walked.unwrap();
+            let inserted = self.provider.bulkinsert(ips, &src);
+
+            if let Err(err) = inserted {
+                println!("NodeProvider failed with : {}", err);
+                continue;
+            }
 
         }
     }

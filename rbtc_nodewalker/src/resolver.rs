@@ -1,5 +1,3 @@
-use crate::config::Config;
-
 use dns_lookup::{lookup_host};
 
 use std::net::IpAddr;

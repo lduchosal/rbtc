@@ -50,4 +50,12 @@ pub enum EncodeError {
     VersionUserAgentLen,
     VersionStartHeight,
     VersionRelay,
+
+    NetworkAddrTime,
+    NetworkAddrServices,
+    NetworkAddrIp,
+    NetworkAddrPort,
+
+    Service,
+    IpAddr
 }

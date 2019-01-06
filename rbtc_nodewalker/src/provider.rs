@@ -3,6 +3,7 @@ extern crate rusqlite;
 use crate::node::Node;
 
 use std::path::Path;
+use std::fmt;
 
 use rusqlite::types::ToSql;
 use rusqlite::{Connection, NO_PARAMS};
@@ -15,6 +16,12 @@ pub enum ProviderError {
     InsertIterator,
     Select,
     SelectIterator
+}
+
+impl fmt::Display for ProviderError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 pub struct NodeProvider {

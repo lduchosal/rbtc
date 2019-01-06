@@ -1,10 +1,10 @@
 use crate::network::message::{NetworkMessage, Encodable};
+use crate::network::networkaddr::NetworkAddr;
 use crate::network::error::EncodeError;
 use crate::network::message::Command;
 
-use std::io::{Read, Write};
-use std::io::Cursor;
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use std::io::{Write};
+use byteorder::{LittleEndian, WriteBytesExt};
 
 /// The `version` message
 /// https://en.bitcoin.it/wiki/Protocol_documentation#version
@@ -44,8 +44,8 @@ pub struct Version {
     pub version: i32,
     pub services: Service,
     pub timestamp: i64,
-    pub receiver: [u8; 26],
-    pub sender: [u8; 26],
+    pub receiver: NetworkAddr,
+    pub sender: NetworkAddr,
     pub nonce: u64,
     pub user_agent: String,
     pub start_height: i32,
@@ -55,6 +55,7 @@ pub struct Version {
 /// The following services are currently assigned:
 /// https://en.bitcoin.it/wiki/Protocol_documentation#version
 /// 
+/// ```
 /// +-------+----------------------+-----------------------------------------------------------------+
 /// | Value | Name                 | Description                                                     |
 /// +-------+----------------------+-----------------------------------------------------------------+
@@ -64,6 +65,7 @@ pub struct Version {
 /// |    8  | NODE_WITNESS         | See BIP 0144                                                    | 
 /// | 1024  | NODE_NETWORK_LIMITED | See BIP 0159                                                    |
 /// +-------+----------------------+-----------------------------------------------------------------+
+/// ```
 #[derive(Debug, Clone)]
 pub enum Service {
     Network = 1,
@@ -73,6 +75,12 @@ pub enum Service {
     NetworkLimited = 1024,
 }
 
+impl Encodable for Service {
+    fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError> {
+        w.write_u64::<LittleEndian>(self.clone() as u64).map_err(|_| EncodeError::Service)?;
+        Ok(())
+    }
+}
 
 impl NetworkMessage for Version {
 
@@ -86,10 +94,11 @@ impl Encodable for Version {
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError> {
 
         w.write_i32::<LittleEndian>(self.version).map_err(|_| EncodeError::VersionVersion)?;
-        w.write_u64::<LittleEndian>(self.services.clone() as u64).map_err(|_| EncodeError::VersionServices)?;
+        self.services.encode(w).map_err(|_| EncodeError::VersionServices)?;
+        //w.write_u64::<LittleEndian>(self.services.clone() as u64).map_err(|_| EncodeError::VersionServices)?;
         w.write_i64::<LittleEndian>(self.timestamp).map_err(|_| EncodeError::VersionTimestamp)?;
-        w.write_all(&self.receiver).map_err(|_| EncodeError::VersionReceiver)?;
-        w.write_all(&self.sender).map_err(|_| EncodeError::VersionSender)?;
+        self.receiver.encode(w).map_err(|_| EncodeError::VersionReceiver)?;
+        self.sender.encode(w).map_err(|_| EncodeError::VersionSender)?;
         w.write_u64::<LittleEndian>(self.nonce).map_err(|_| EncodeError::VersionNonce)?;
 
         let b_user_agent = self.user_agent.as_bytes();
@@ -107,9 +116,12 @@ mod test {
 
     use crate::network::version::Version;
     use crate::network::version::Service;
+    use crate::network::networkaddr::NetworkAddr;
     use crate::network::message::Encodable;
     use crate::network::message::NetworkMessage;
     use crate::utils::hexdump;
+
+    use std::net::IpAddr;
 
      #[test]
     fn version_message_test() {
@@ -127,14 +139,26 @@ mod test {
         // This message is from a satoshi node, morning of May 27 2014
         let original : Vec<u8> = hexdump::parse(dump);
 
-        // let decode: Result<VersionMessage, _> = deserialize(&from_sat);
-
+        let service = Service::Network;
+        let ip_receiver = IpAddr::V4("0.0.0.0".parse().unwrap());
         let version = Version {
             version: 70002,
-            services: Service::Network,
-            timestamp: 1401217254,
-            receiver: [ 1, 0, 0, 0, 0, 0, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ],
-            sender:   [ 1, 0, 0, 0, 0, 0, 0, 0, 0xfd, 0x87, 0xd8, 0x7e, 0xeb, 0x43, 0x64, 0xf2, 0x2c, 0xf5, 0x4d, 0xca, 0x59, 0x41, 0x2d, 0xb7, 0x20, 0x8d ],
+            services: service.clone(),
+            timestamp: 0,
+            receiver: NetworkAddr {
+                time: None,
+                services: service.clone(),
+                ip: ip_receiver,
+                port: 0
+            },
+            //[ 1, 0, 0, 0, 0, 0, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ],
+            sender: NetworkAddr {
+                time: None,
+                services: service,
+                ip: ip_receiver,
+                port: 0
+            },
+            // [ 1, 0, 0, 0, 0, 0, 0, 0, 0xfd, 0x87, 0xd8, 0x7e, 0xeb, 0x43, 0x64, 0xf2, 0x2c, 0xf5, 0x4d, 0xca, 0x59, 0x41, 0x2d, 0xb7, 0x20, 0x8d ],
             nonce: 0xE83EE8FCCF20D947,
             user_agent: "/Satoshi:0.9.99/".to_string(),
             start_height: 0x00049F2C,
