@@ -105,6 +105,7 @@ pub enum Error {
     TxInTransactionHash,
     TxInSequence,
     TxInIndex,
+    TxInOutPoint,
 
     WitnessesCount,
     WitnessLen,
@@ -114,4 +115,7 @@ pub enum Error {
     VarIntFD,
     VarIntFE,
     VarIntFF,
+
+    OutPointTransactionHash,
+    OutPointIndex
 }

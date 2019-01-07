@@ -45,14 +45,7 @@ pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxIn>, Error> {
 
 pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxIn, Error> {
 
-    let mut transaction_hash = [0; 32];
-    r.read_exact(&mut transaction_hash).map_err(|_| Error::TxInTransactionHash)?;
-    let index = u32::decode(r).map_err(|_| Error::TxInIndex)?;
-
-    let previous = OutPoint {
-        transaction_hash: transaction_hash,
-        index: index,
-    };
+    let previous = OutPoint::decode(r).map_err(|_| Error::TxInOutPoint)?;
 
     let signature = script::decode(r)
         .map_err(|e| {
