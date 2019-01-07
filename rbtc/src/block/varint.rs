@@ -1,4 +1,5 @@
 use crate::block::error::Error;
+use crate::network::encode::{Encodable, Decodable};
 
 use std::io::Cursor;
 use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
@@ -34,9 +35,9 @@ pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<u64, Error> {
 
     let varlen = r.read_u8().map_err(|_| Error::VarInt)?;
     match varlen {
-        0xFD => r.read_u16::<LittleEndian>().map(|v| v as u64).map_err(|_| Error::VarIntFD),
-        0xFE => r.read_u32::<LittleEndian>().map(|v| v as u64).map_err(|_| Error::VarIntFE),
-        0xFF => r.read_u64::<LittleEndian>().map(|v| v as u64).map_err(|_| Error::VarIntFF),
+        0xFD => u16::decode(r).map(|v| v as u64).map_err(|_| Error::VarIntFD),
+        0xFE => u32::decode(r).map(|v| v as u64).map_err(|_| Error::VarIntFE),
+        0xFF => u64::decode(r).map(|v| v as u64).map_err(|_| Error::VarIntFF),
         _ => Ok(varlen as u64)
     }
 
@@ -51,18 +52,20 @@ pub(crate) fn encode(w: &mut Vec<u8>, size: u64) -> Result<(), Error> {
         _ => 0xFF,
     };
 
-    w.write_u8(size_enc).map_err(|_| Error::VarInt)?;
+    size_enc.encode(w).map_err(|_| Error::VarInt)?;
 
     match size {
         0...0xFC => {},
         0xFD...0xFFFF => {
-            w.write_u16::<LittleEndian>(size as u16).map_err(|_| Error::VarIntFD)?;
+            let s = size as u16;
+            s.encode(w).map_err(|_| Error::VarIntFD)?;
         },
         0x10000...0xFFFFFFFF => {
-            w.write_u32::<LittleEndian>(size as u32).map_err(|_| Error::VarIntFE)?;
+            let s = size as u32;
+            s.encode(w).map_err(|_| Error::VarIntFE)?;
         },
         _ => {
-            w.write_u64::<LittleEndian>(size).map_err(|_| Error::VarIntFF)?;
+            size.encode(w).map_err(|_| Error::VarIntFF)?;
         },
     };
 

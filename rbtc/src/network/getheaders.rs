@@ -61,7 +61,7 @@ impl Encodable for GetHeadersMessage {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
-        w.write_u32::<LittleEndian>(self.version).map_err(|_| Error::GetHeadersVersion)?;
+        self.version.encode(w).map_err(|_| Error::GetHeadersVersion)?;
 
         varint::encode(w, self.locators.len() as u64).map_err(|_| Error::GetHeadersLocatorsCount)?;
         for locator in &self.locators {

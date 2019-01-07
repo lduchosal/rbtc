@@ -61,8 +61,7 @@ impl Encodable for NetworkAddr {
 
         self.services.encode(w).map_err(|_| Error::NetworkAddrServices)?;
         self.ip.encode(w).map_err(|_| Error::NetworkAddrIp)?;
-        w.write_u16::<BigEndian>(self.port).map_err(|_| Error::NetworkAddrPort)?;
-
+        self.port.encode(w).map_err(|_| Error::NetworkAddrPort)?;
         Ok(())
     }
 }
@@ -70,7 +69,7 @@ impl Encodable for NetworkAddr {
 impl Encodable for TimedNetworkAddr {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
-        w.write_u32::<LittleEndian>(self.time).map_err(|_| Error::TimedNetworkAddrTime)?;
+        self.time.encode(w).map_err(|_| Error::TimedNetworkAddrTime)?;
         self.addr.encode(w)?;
         Ok(())
     }
@@ -99,7 +98,7 @@ impl Decodable for TimedNetworkAddr {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TimedNetworkAddr, Error> {
 
-        let time = r.read_u32::<LittleEndian>().map_err(|_| Error::TimedNetworkAddrTime)?;
+        let time = u32::decode(r).map_err(|_| Error::TimedNetworkAddrTime)?;
         let addr = NetworkAddr::decode(r)?;
 
         let result = TimedNetworkAddr {

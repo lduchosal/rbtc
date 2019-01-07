@@ -2,8 +2,32 @@
 #[derive(PartialEq, Debug)]
 pub enum Error {
 
+    ReadI64,
+    ReadI32,
+    ReadI16,
+    ReadI8,
+
+    ReadU64,
+    ReadU32,
+    ReadU16,
+    ReadU8,
+
     WriteI64,
-    
+    WriteI32,
+    WriteI16,
+    WriteI8,
+        
+    WriteU64,
+    WriteU32,
+    WriteU16,
+    WriteU8,
+
+    ReadBool,
+    WriteBool,
+
+    ReadSha256,
+    WriteSha256,
+
     MessageMagic,
     MessageMagicReverse,
     MessageCommand,

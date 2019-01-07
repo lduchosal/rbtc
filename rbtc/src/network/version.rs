@@ -91,14 +91,15 @@ impl Service {
 
 impl Encodable for Service {
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
-        w.write_u64::<LittleEndian>(self.clone() as u64).map_err(|_| Error::Service)?;
+        let clone = self.clone() as u64;
+        clone.encode(w).map_err(|_| Error::Service)?;
         Ok(())
     }
 }
 
 impl Decodable for Service {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Service, Error> {
-        let value = r.read_u64::<LittleEndian>().map_err(|_| Error::Service)?;
+        let value = u64::decode(r).map_err(|_| Error::Service)?;
         Service::from_value(value)
     }
 }
@@ -114,18 +115,22 @@ impl Encodable for Version {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
-        w.write_i32::<LittleEndian>(self.version).map_err(|_| Error::VersionVersion)?;
+        self.version.encode(w).map_err(|_| Error::VersionVersion)?;
         self.services.encode(w).map_err(|_| Error::VersionServices)?;
-        w.write_i64::<LittleEndian>(self.timestamp).map_err(|_| Error::VersionTimestamp)?;
+        self.timestamp.encode(w).map_err(|_| Error::VersionTimestamp)?;
         self.receiver.encode(w).map_err(|_| Error::VersionReceiver)?;
         self.sender.encode(w).map_err(|_| Error::VersionSender)?;
-        w.write_u64::<LittleEndian>(self.nonce).map_err(|_| Error::VersionNonce)?;
+        self.nonce.encode(w).map_err(|_| Error::VersionNonce)?;
 
-        let b_user_agent = self.user_agent.as_bytes();
-        w.write_u8(b_user_agent.len() as u8).map_err(|_| Error::VersionUserAgentLen)?;
-        w.write_all(b_user_agent).map_err(|_| Error::VersionUserAgent)?;
-        w.write_i32::<LittleEndian>(self.start_height).map_err(|_| Error::VersionStartHeight)?;
-        w.write_u8(if self.relay { 1 } else { 0 }).map_err(|_| Error::VersionRelay)?;
+        let user_agent_bytes = self.user_agent.as_bytes();
+        let user_agent_len = user_agent_bytes.len() as u8;
+
+        user_agent_len.encode(w).map_err(|_| Error::VersionUserAgentLen)?;
+
+        w.write_all(user_agent_bytes).map_err(|_| Error::VersionUserAgent)?;
+
+        self.start_height.encode(w).map_err(|_| Error::VersionStartHeight)?;
+        self.relay.encode(w).map_err(|_| Error::VersionRelay)?;
 
         Ok(())
     }

@@ -137,7 +137,9 @@ impl<'a> Encodable for Message<'a> {
         
         let mut payload : Vec<u8> = Vec::new();
         self.payload.encode(&mut payload)?;
-        w.write_u32::<LittleEndian>(payload.len() as u32).map_err(|_| Error::MessagePayLoadLen)?;
+        let payload_len = payload.len() as u32;
+        
+        payload_len.encode(w).map_err(|_| Error::MessagePayLoadLen)?;
 
         let checksum : [u8; 4] = checksum(&payload).map_err(|_| Error::MessageChecksum)?;
         w.write_all(&checksum).map_err(|_| Error::MessageChecksum)?;
