@@ -1,7 +1,10 @@
 use crate::network::message::Command;
-use crate::network::error::{EncodeError};
-use crate::network::message::{NetworkMessage, Encodable};
+use crate::network::error::Error;
+use crate::network::message::{NetworkMessage};
+use crate::network::encode::{Encodable, Decodable};
 
+use std::io::{Read, Write, Cursor};
+use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 
 /// https://en.bitcoin.it/wiki/Protocol_documentation#getaddr
 /// 
@@ -17,7 +20,7 @@ use crate::network::message::{NetworkMessage, Encodable};
 /// 
 /// No additional data is transmitted with this message.
 /// 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct GetAddr {
 }
 
@@ -30,8 +33,16 @@ impl NetworkMessage for GetAddr {
 
 impl Encodable for GetAddr {
 
-    fn encode(&self, _: &mut Vec<u8>) -> Result<(), EncodeError> {
+    fn encode(&self, _: &mut Vec<u8>) -> Result<(), Error> {
         Ok(())
+    }
+}
+
+
+impl Decodable for GetAddr {
+
+    fn decode(_: &mut Cursor<&Vec<u8>>) -> Result<GetAddr, Error> {
+        Ok(GetAddr {})
     }
 }
 
@@ -39,8 +50,12 @@ impl Encodable for GetAddr {
 #[cfg(test)]
 mod test {
 
-    use crate::network::message::Encodable;
+    use crate::network::message::NetworkMessage;
+    use crate::network::encode::{Encodable, Decodable};
     use crate::network::getaddr::GetAddr;
+
+    use std::io::{Read, Write, Cursor};
+    use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 
     #[test]
     fn when_encode_getaddr_then_nothing_to_encode() {
@@ -51,6 +66,19 @@ mod test {
         let result = message.encode(&mut data);
         assert!(result.is_ok());
         assert_eq!(0, data.len())
+    }
+
+    #[test]
+    fn when_decode_getaddr_then_nothing_to_encode() {
+
+        let mut data : Vec<u8> = Vec::new();
+        let mut read = Cursor::new(&data);
+        let result = GetAddr::decode(&mut read);
+
+        let expected = GetAddr {};
+
+        assert!(result.is_ok());
+        assert_eq!(expected, result.unwrap());
     }
 
 }

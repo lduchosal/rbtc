@@ -1,32 +1,33 @@
 
 #[derive(PartialEq, Debug)]
-pub enum DecodeError {
-    MessageMagic,
-    MessageCommand,
-    MessagePayLoadLen,
-    MessagePayLoad,
-    MessageChecksum,
+pub enum Error {
 
-    GetHeadersVersion,
-    GetHeadersLocatorsCount,
-    GetHeadersLocators,
-    GetHeadersLocator,
-    GetHeadersStop,
+    ReadI64,
+    ReadI32,
+    ReadI16,
+    ReadI8,
 
-    VersionVersion,
-    VersionServices,
-    VersionTimestamp,
-    VersionReceiver,
-    VersionSender,
-    VersionNonce,
-    VersionUserAgent,
-    VersionUserAgentLen,
-    VersionStartHeight,
-    VersionRelay,
-}
+    ReadU64,
+    ReadU32,
+    ReadU16,
+    ReadU8,
 
-#[derive(PartialEq, Debug)]
-pub enum EncodeError {
+    WriteI64,
+    WriteI32,
+    WriteI16,
+    WriteI8,
+        
+    WriteU64,
+    WriteU32,
+    WriteU16,
+    WriteU8,
+
+    ReadBool,
+    WriteBool,
+
+    ReadSha256,
+    WriteSha256,
+
     MessageMagic,
     MessageMagicReverse,
     MessageCommand,
@@ -56,6 +57,18 @@ pub enum EncodeError {
     NetworkAddrIp,
     NetworkAddrPort,
 
+    TimedNetworkAddrTime,
+
     Service,
-    IpAddr
+    ServiceMatch,
+
+    IpAddr,
+    IpAddrB1,
+    IpAddrB2,
+    IpAddrB3,
+    IpAddrB4,
+    IpAddrB5,
+    IpAddrB6,
+    IpAddrB7,
+    IpAddrB8,
 }

@@ -1,7 +1,9 @@
 use rbtc::network::networkaddr::NetworkAddr;
 use rbtc::network::version::Version;
 use rbtc::network::version::Service;
-use rbtc::network::message::{Encodable, Message, Magic};
+use rbtc::network::message::NetworkMessage;
+use rbtc::network::message::{Message, Magic};
+use rbtc::network::encode::{Encodable, Decodable};
 
 use rbtc::utils::hexdump;
 
@@ -40,6 +42,23 @@ impl NodeWalker {
         }
     }
 
+    /// 
+    /// https://en.bitcoin.it/wiki/Version_Handshake
+    /// 
+    /// On connect, version and verack messages are exchanged, in order to ensure compatibility between peers.
+    /// 
+    /// Version Handshake
+    /// When the local peer (L) connects to a remote peer (R), the remote peer will not send any data until it receives a version message.
+    /// 
+    /// L -> R: Send version message with the local peer's version
+    /// R -> L: Send version message back
+    /// R -> L: Send verack message
+    /// R:      Sets version to the minimum of the 2 versions
+    /// L -> R: Send verack message after receiving version message from R
+    /// L:      Sets version to the minimum of the 2 versions
+    /// 
+    /// Note: Versions below 31800 are no longer supported.
+    /// 
     pub fn walk(&self, nodeip: &String) -> Result<Vec<String>, NodeWalkerError> {
 
         let mut node_ip_port = nodeip.clone();
@@ -100,19 +119,17 @@ impl NodeWalker {
         let now = chrono::Local::now();
         let mut rng = rand::thread_rng();
         let nonce: u64 = rng.gen();
-        
+
         Version {
             version: 70002,
             services: Service::Network,
             timestamp: now.timestamp(),
             receiver: NetworkAddr {
-                time: None,
                 services: Service::Network,
                 ip: IpAddr::V4("0.0.0.0".parse().unwrap()),
                 port: 0
             },
             sender: NetworkAddr {
-                time: None,
                 services: Service::Network,
                 ip: IpAddr::V4("0.0.0.0".parse().unwrap()),
                 port: 0

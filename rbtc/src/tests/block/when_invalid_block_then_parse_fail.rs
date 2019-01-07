@@ -1,5 +1,5 @@
 
-use crate::block::error::DecodeError;
+use crate::block::error::Error;
 use crate::block::block;
 use crate::utils::hexdump;
 
@@ -19,6 +19,6 @@ fn test() {
     assert!(result.is_err());
 
     let b = result.err().unwrap();
-    assert_eq!(b, DecodeError::InvalidLength);
+    assert_eq!(b, Error::InvalidLength);
 
 }

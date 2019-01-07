@@ -1,21 +1,20 @@
 use crate::block::transaction;
-use crate::block::error::DecodeError;
+use crate::block::error::Error;
 use crate::primitives::block::Block;
 
-use std::io::Read;
-use std::io::Cursor;
+use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, ReadBytesExt};
 
-pub fn parse(hex: &Vec<u8>) -> Result<Block, DecodeError> {
+pub fn parse(hex: &Vec<u8>) -> Result<Block, Error> {
 
     if hex.len() < 81 { // might not be true
-        return Err(DecodeError::InvalidLength);
+        return Err(Error::InvalidLength);
     }
     let mut r = Cursor::new(hex);
     let result = decode(&mut r)?;
 
     if r.position() as usize != hex.len() {
-        return Err(DecodeError::RemainingContent);
+        return Err(Error::RemainingContent);
     }
     Ok(result)
 }
@@ -38,19 +37,19 @@ pub fn parse(hex: &Vec<u8>) -> Result<Block, DecodeError> {
 /// |                      |                                                |  many transactions       |
 /// +----------------------+------------------------------------------------+--------------------------+
 /// 
-fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Block, DecodeError> {
+fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Block, Error> {
 
-    let version = r.read_u32::<LittleEndian>().map_err(|_| DecodeError::BlockVersion)?;
+    let version = r.read_u32::<LittleEndian>().map_err(|_| Error::BlockVersion)?;
 
     let mut previous = [0; 32];
-    r.read_exact(&mut previous).map_err(|_| DecodeError::BlockPrevious)?;
+    r.read_exact(&mut previous).map_err(|_| Error::BlockPrevious)?;
 
     let mut merkleroot = [0; 32];
-    r.read_exact(&mut merkleroot).map_err(|_| DecodeError::BlockMerkleRoot)?;
+    r.read_exact(&mut merkleroot).map_err(|_| Error::BlockMerkleRoot)?;
 
-    let time = r.read_u32::<LittleEndian>().map_err(|_| DecodeError::BlockTime)?;
-    let bits = r.read_u32::<LittleEndian>().map_err(|_| DecodeError::BlockBits)?;
-    let nonce = r.read_u32::<LittleEndian>().map_err(|_| DecodeError::BlockNonce)?;
+    let time = r.read_u32::<LittleEndian>().map_err(|_| Error::BlockTime)?;
+    let bits = r.read_u32::<LittleEndian>().map_err(|_| Error::BlockBits)?;
+    let nonce = r.read_u32::<LittleEndian>().map_err(|_| Error::BlockNonce)?;
 
     let transactions = transaction::decode_all(r)?;
 
@@ -72,7 +71,7 @@ mod test {
 
     use crate::block::block;
     use crate::utils::hexdump;
-    use crate::block::error::DecodeError;
+    use crate::block::error::Error;
 
     use crate::primitives::block::Block;
     use std::io::Cursor;
@@ -91,7 +90,7 @@ mod test {
         assert_eq!(c.position(), 0);
 
         if let Err(e) = block {
-            assert_eq!(e, DecodeError::BlockVersion);
+            assert_eq!(e, Error::BlockVersion);
         } else {
             panic!("should have failed");
         }
@@ -111,7 +110,7 @@ mod test {
         assert_eq!(c.position(), 0);
 
         if let Err(e) = block {
-            assert_eq!(e, DecodeError::BlockVersion);
+            assert_eq!(e, Error::BlockVersion);
         } else {
             panic!("should have failed");
         }
@@ -132,7 +131,7 @@ mod test {
         assert_eq!(c.position(), 4);
 
         if let Err(e) = block {
-            assert_eq!(e, DecodeError::BlockPrevious);
+            assert_eq!(e, Error::BlockPrevious);
         } else {
             panic!("should have failed");
         }
@@ -155,7 +154,7 @@ mod test {
         assert_eq!(c.position(), 36);
 
         if let Err(e) = block {
-            assert_eq!(e, DecodeError::BlockMerkleRoot);
+            assert_eq!(e, Error::BlockMerkleRoot);
         } else {
             panic!("should have failed");
         }
@@ -179,7 +178,7 @@ mod test {
         assert_eq!(c.position(), 68);
 
         if let Err(e) = block {
-            assert_eq!(e, DecodeError::BlockTime);
+            assert_eq!(e, Error::BlockTime);
         } else {
             panic!("should have failed");
         }
@@ -204,7 +203,7 @@ mod test {
         assert_eq!(c.position(), 72);
 
         if let Err(e) = block {
-            assert_eq!(e, DecodeError::BlockBits);
+            assert_eq!(e, Error::BlockBits);
         } else {
             panic!("should have failed");
         }
@@ -228,7 +227,7 @@ mod test {
         assert_eq!(c.position(), 76);
 
         if let Err(e) = block {
-            assert_eq!(e, DecodeError::BlockNonce);
+            assert_eq!(e, Error::BlockNonce);
         } else {
             panic!("should have failed");
         }
@@ -253,7 +252,7 @@ mod test {
         assert_eq!(c.position(), 80);
 
         if let Err(e) = block {
-            assert_eq!(e, DecodeError::TransactionsCount);
+            assert_eq!(e, Error::TransactionsCount);
         } else {
             panic!("should have failed");
         }

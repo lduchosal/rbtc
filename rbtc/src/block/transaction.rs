@@ -1,4 +1,4 @@
-use crate::block::error::DecodeError;
+use crate::block::error::Error;
 use crate::block::varint;
 use crate::block::txin;
 use crate::block::txout;
@@ -6,8 +6,9 @@ use crate::block::witness;
 
 use crate::primitives::transaction::Transaction;
 
-use std::io::Cursor;
-use byteorder::{LittleEndian, ReadBytesExt};
+use std::io::{Read, Write, Cursor};
+use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
+
 
 /// 
 /// https://en.bitcoin.it/wiki/Transaction
@@ -40,14 +41,14 @@ use byteorder::{LittleEndian, ReadBytesExt};
 /// |                 |  when transaction is final                   |                              | 
 /// +-----------------+----------------------------------------------+------------------------------+ 
 /// 
-pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, DecodeError> {
+pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, Error> {
 
-    let version = r.read_i32::<LittleEndian>().map_err(|_| DecodeError::TransactionVersion)?;
+    let version = r.read_i32::<LittleEndian>().map_err(|_| Error::TransactionVersion)?;
 
     let position = r.position();
     let flag = r.read_u16::<LittleEndian>()
         .map(|v| match v { 0x0100 => Some(v), _ => None })
-        .map_err(|_| DecodeError::TransactionFlag)?;
+        .map_err(|_| Error::TransactionFlag)?;
     
     if flag.is_none() {
         r.set_position(position);
@@ -61,7 +62,7 @@ pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, DecodeError> {
         _ => None
     };
 
-    let locktime = r.read_u32::<LittleEndian>().map_err(|_| DecodeError::TransactionLockTime)?;
+    let locktime = r.read_u32::<LittleEndian>().map_err(|_| Error::TransactionLockTime)?;
 
     let result = Transaction {
         version: version,
@@ -76,10 +77,10 @@ pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, DecodeError> {
 }
 
 
-pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Transaction>, DecodeError> {
+pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Transaction>, Error> {
 
     let mut result : Vec<Transaction> = Vec::new();
-    let count = varint::decode(r).map_err(|_| DecodeError::TransactionsCount)?;
+    let count = varint::decode(r).map_err(|_| Error::TransactionsCount)?;
 
     for _ in 0..count {
         let transaction = decode(r)?;

@@ -5,7 +5,8 @@ use tokio::net::TcpStream;
 use tokio::prelude::*;
 
 use crate::utils::sha256::Sha256;
-use crate::network::message::Encodable;
+use crate::network::message::NetworkMessage;
+use crate::network::encode::{Encodable, Decodable};
 use crate::network::getheaders::GetHeadersMessage;
 use crate::network::message::{Message, Magic, Command};
 

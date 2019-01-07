@@ -1,9 +1,12 @@
-use crate::network::error::{EncodeError};
+use crate::network::error::Error;
+use crate::network::encode::{Encodable, Decodable};
+
 use sha2::{Sha256, Digest};
 
 use std::fmt;
-use std::io::{Write};
-use byteorder::{LittleEndian, WriteBytesExt};
+use std::io::{Read, Write, Cursor};
+use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
+
 
 /// https://en.bitcoin.it/wiki/Protocol_documentation <br/>
 /// Known magic values:
@@ -36,10 +39,10 @@ impl Magic {
 }
 
 impl Encodable for Magic {
-    fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError> {
+    fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
         let mut wire = self.value().clone();
         wire.reverse();
-        w.write_all(&wire).map_err(|_| EncodeError::MessageMagic)?;
+        w.write_all(&wire).map_err(|_| Error::MessageMagic)?;
         Ok(())
     }
 }
@@ -77,10 +80,6 @@ pub struct Message<'a> {
 
 pub trait NetworkMessage : Encodable {
     fn command(&self) -> Command;
-}
-
-pub trait Encodable {
-    fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError>;
 }
 
 #[derive(Debug)]
@@ -123,9 +122,9 @@ impl fmt::Display for Command {
     }
 }
 
-impl<'a> crate::network::message::Encodable for Message<'a> {
+impl<'a> Encodable for Message<'a> {
 
-    fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError> {
+    fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
         self.magic.encode(w)?;
         
@@ -134,15 +133,17 @@ impl<'a> crate::network::message::Encodable for Message<'a> {
             .to_lowercase();
             
         command.truncate(12);
-        w.write_all(command.as_bytes()).map_err(|_| EncodeError::MessageCommand)?;
+        w.write_all(command.as_bytes()).map_err(|_| Error::MessageCommand)?;
         
         let mut payload : Vec<u8> = Vec::new();
         self.payload.encode(&mut payload)?;
-        w.write_u32::<LittleEndian>(payload.len() as u32).map_err(|_| EncodeError::MessagePayLoadLen)?;
+        let payload_len = payload.len() as u32;
+        
+        payload_len.encode(w).map_err(|_| Error::MessagePayLoadLen)?;
 
-        let checksum : [u8; 4] = checksum(&payload).map_err(|_| EncodeError::MessageChecksum)?;
-        w.write_all(&checksum).map_err(|_| EncodeError::MessageChecksum)?;
-        w.write_all(payload.as_ref()).map_err(|_| EncodeError::MessagePayLoad)?;
+        let checksum : [u8; 4] = checksum(&payload).map_err(|_| Error::MessageChecksum)?;
+        w.write_all(&checksum).map_err(|_| Error::MessageChecksum)?;
+        w.write_all(payload.as_ref()).map_err(|_| Error::MessagePayLoad)?;
 
         Ok(())
     }
@@ -169,8 +170,9 @@ mod test {
     use crate::network::message::Magic;
     use crate::network::message::Command;
     use crate::network::message::Message;
-    use crate::network::message::EncodeError;
-    use crate::network::message::{NetworkMessage, Encodable};
+    use crate::network::message::Error;
+    use crate::network::message::NetworkMessage;
+    use crate::network::encode::{Encodable, Decodable};
     
     use crate::network::getaddr::GetAddr;
 
@@ -189,7 +191,7 @@ mod test {
 
     impl Encodable for NetworkMessageMock {
 
-        fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError> {
+        fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
             w.append(&mut self.text.clone());
             Ok(())
         }

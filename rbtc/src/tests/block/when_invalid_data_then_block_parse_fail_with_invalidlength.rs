@@ -1,6 +1,6 @@
 
 use crate::block::block;
-use crate::block::error::DecodeError;
+use crate::block::error::Error;
 use crate::utils::hexdump;
 
 #[test]
@@ -36,6 +36,6 @@ fn test() {
     assert!(result.is_err());
 
     let err = result.err().unwrap();
-    assert_eq!(err, DecodeError::RemainingContent)
+    assert_eq!(err, Error::RemainingContent)
 
 }

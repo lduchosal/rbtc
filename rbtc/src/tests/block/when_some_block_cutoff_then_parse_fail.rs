@@ -1,5 +1,5 @@
 use crate::block::block;
-use crate::block::error::DecodeError;
+use crate::block::error::Error;
 use crate::utils::hexdump;
 
 #[test]
@@ -56,5 +56,5 @@ fn test() {
 
     let err = result.err().unwrap();
 
-    assert_eq!(err, DecodeError::TransactionLockTime);
+    assert_eq!(err, Error::TransactionLockTime);
 }

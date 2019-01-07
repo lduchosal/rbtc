@@ -1,10 +1,11 @@
-use crate::network::message::{NetworkMessage, Encodable};
+use crate::network::message::{NetworkMessage};
+use crate::network::encode::{Encodable, Decodable};
 use crate::network::networkaddr::NetworkAddr;
-use crate::network::error::EncodeError;
+use crate::network::error::Error;
 use crate::network::message::Command;
 
-use std::io::{Write};
-use byteorder::{LittleEndian, WriteBytesExt};
+use std::io::{Write, Read, Cursor};
+use byteorder::{LittleEndian, WriteBytesExt, ReadBytesExt};
 
 /// The `version` message
 /// https://en.bitcoin.it/wiki/Protocol_documentation#version
@@ -65,7 +66,7 @@ pub struct Version {
 /// | 1024  | NODE_NETWORK_LIMITED | See BIP 0159                                                    |
 /// +-------+----------------------+-----------------------------------------------------------------+
 /// 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Service {
     Network = 1,
     GetUtxo = 2,
@@ -74,10 +75,31 @@ pub enum Service {
     NetworkLimited = 1024,
 }
 
+impl Service {
+    pub fn from_value(value :u64) -> Result<Service, Error> {
+        match value {
+            1 => Ok(Service::Network),
+            2 => Ok(Service::GetUtxo),
+            4 => Ok(Service::Bloom),
+            8 => Ok(Service::Witness),
+            1024 => Ok(Service::NetworkLimited),
+            _ => Err(Error::ServiceMatch)
+        }
+    }
+}
+
 impl Encodable for Service {
-    fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError> {
-        w.write_u64::<LittleEndian>(self.clone() as u64).map_err(|_| EncodeError::Service)?;
+    fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
+        let clone = self.clone() as u64;
+        clone.encode(w).map_err(|_| Error::Service)?;
         Ok(())
+    }
+}
+
+impl Decodable for Service {
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Service, Error> {
+        let value = u64::decode(r).map_err(|_| Error::Service)?;
+        Service::from_value(value)
     }
 }
 
@@ -90,21 +112,24 @@ impl NetworkMessage for Version {
 
 impl Encodable for Version {
 
-    fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError> {
+    fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
-        w.write_i32::<LittleEndian>(self.version).map_err(|_| EncodeError::VersionVersion)?;
-        self.services.encode(w).map_err(|_| EncodeError::VersionServices)?;
-        //w.write_u64::<LittleEndian>(self.services.clone() as u64).map_err(|_| EncodeError::VersionServices)?;
-        w.write_i64::<LittleEndian>(self.timestamp).map_err(|_| EncodeError::VersionTimestamp)?;
-        self.receiver.encode(w).map_err(|_| EncodeError::VersionReceiver)?;
-        self.sender.encode(w).map_err(|_| EncodeError::VersionSender)?;
-        w.write_u64::<LittleEndian>(self.nonce).map_err(|_| EncodeError::VersionNonce)?;
+        self.version.encode(w).map_err(|_| Error::VersionVersion)?;
+        self.services.encode(w).map_err(|_| Error::VersionServices)?;
+        self.timestamp.encode(w).map_err(|_| Error::VersionTimestamp)?;
+        self.receiver.encode(w).map_err(|_| Error::VersionReceiver)?;
+        self.sender.encode(w).map_err(|_| Error::VersionSender)?;
+        self.nonce.encode(w).map_err(|_| Error::VersionNonce)?;
 
-        let b_user_agent = self.user_agent.as_bytes();
-        w.write_u8(b_user_agent.len() as u8).map_err(|_| EncodeError::VersionUserAgentLen)?;
-        w.write_all(b_user_agent).map_err(|_| EncodeError::VersionUserAgent)?;
-        w.write_i32::<LittleEndian>(self.start_height).map_err(|_| EncodeError::VersionStartHeight)?;
-        w.write_u8(if self.relay { 1 } else { 0 }).map_err(|_| EncodeError::VersionRelay)?;
+        let user_agent_bytes = self.user_agent.as_bytes();
+        let user_agent_len = user_agent_bytes.len() as u8;
+
+        user_agent_len.encode(w).map_err(|_| Error::VersionUserAgentLen)?;
+
+        w.write_all(user_agent_bytes).map_err(|_| Error::VersionUserAgent)?;
+
+        self.start_height.encode(w).map_err(|_| Error::VersionStartHeight)?;
+        self.relay.encode(w).map_err(|_| Error::VersionRelay)?;
 
         Ok(())
     }
@@ -116,8 +141,8 @@ mod test {
     use crate::network::version::Version;
     use crate::network::version::Service;
     use crate::network::networkaddr::NetworkAddr;
-    use crate::network::message::Encodable;
     use crate::network::message::NetworkMessage;
+    use crate::network::encode::{Encodable, Decodable};
     use crate::utils::hexdump;
 
     use std::net::IpAddr;
@@ -136,22 +161,22 @@ mod test {
 
         // This message is from a satoshi node, morning of May 27 2014
         let original : Vec<u8> = hexdump::decode(dump);
+        let service = Service::Network;
+        let ip_receiver = IpAddr::V4("0.0.0.0".parse().unwrap());
 
         let version = Version {
             version: 70002,
             services: Service::Network,
             timestamp: 1401217254,
             receiver: NetworkAddr {
-                time: None,
-                services: Service::Network,
-                ip: IpAddr::V4("0.0.0.0".parse().unwrap()),
+                services: service.clone(),
+                ip: ip_receiver,
                 port: 0
             },
             sender: NetworkAddr {
-                time: None,
-                services: Service::Network,
-                ip: IpAddr::V6("fd87:d87e:eb43:64f2:2cf5:4dca:5941:2db7".parse().unwrap()),
-                port: 8333
+                services: service,
+                ip: ip_receiver,
+                port: 0
             },
             nonce: 0xE83EE8FCCF20D947,
             user_agent: "/Satoshi:0.9.99/".to_string(),
