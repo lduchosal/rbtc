@@ -8,4 +8,5 @@ pub mod primitives;
 pub mod network;
 pub mod block;
 pub mod utils;
+pub mod encode;
 mod tests;

@@ -1,4 +1,4 @@
-use crate::network::error::Error;
+use crate::encode::error::Error;
 
 use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
@@ -75,7 +75,6 @@ impl Decodable for i8 {
     }
 }
 
-
 impl Encodable for u64 {
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
         w.write_u64::<LittleEndian>(*self).map_err(|_| Error::WriteU64)?;
@@ -89,7 +88,6 @@ impl Decodable for u64 {
         Ok(result)
     }
 }
-
 
 impl Encodable for u32 {
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
@@ -134,7 +132,6 @@ impl NetworkDecodable for u16 {
     }
 }
 
-
 impl Encodable for u8 {
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
         w.write_u8(*self).map_err(|_| Error::WriteU8)?;
@@ -149,17 +146,17 @@ impl Decodable for u8 {
     }
 }
 
-
 impl Encodable for bool {
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
-        w.write_u8(if *self { 1 } else { 0 }).map_err(|_| Error::WriteBool)?;
+        let value : u8 = if *self { 1 } else { 0 };
+        value.encode(w).map_err(|_| Error::WriteBool)?;
         Ok(())
     }
 }
 
 impl Decodable for bool {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<bool, Error> {
-        let b = r.read_u8().map_err(|_| Error::ReadBool)?;
+        let b = u8::decode(r).map_err(|_| Error::ReadBool)?;
         let result = match b {
             0 => false,
             _ => true

@@ -1,5 +1,6 @@
-use crate::block::error::Error;
-use crate::block::varint;
+use crate::encode::error::Error;
+use crate::encode::encode::{Encodable, Decodable};
+use crate::block::varint::VarInt;
 use crate::primitives::witness::Witness;
 
 use std::io::{Read, Write, Cursor};
@@ -8,8 +9,8 @@ use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 
 pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Witness>, Error> {
     let mut result: Vec<Witness> = Vec::new();
-    let count = varint::decode(r).map_err(|_| Error::WitnessesCount)?;
-    for _ in 0..count {
+    let count = VarInt::decode(r).map_err(|_| Error::WitnessesCount)?;
+    for _ in 0..count.0 {
         let witness = decode(r)?;
         result.push(witness);
     }
@@ -18,8 +19,8 @@ pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Witness>, Error
 }
 
 pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Witness, Error> {
-    let varlen = varint::decode(r).map_err(|_| Error::WitnessLen)?;
-    let mut data = vec![0u8; varlen as usize];
+    let varlen = VarInt::decode(r).map_err(|_| Error::WitnessLen)?;
+    let mut data = vec![0u8; varlen.0 as usize];
     let mut data_ref = data.as_mut_slice();
     r.read_exact(&mut data_ref)
         .map_err(|_| Error::WitnessData)?;
@@ -32,7 +33,7 @@ pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Witness, Error> {
 #[cfg(test)]
 mod test {
 
-    use crate::block::error::Error;
+    use crate::encode::error::Error;
     use crate::block::witness;
     use crate::primitives::witness::Witness;
 

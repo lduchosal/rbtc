@@ -1,5 +1,6 @@
-use crate::block::error::Error;
-use crate::block::varint;
+use crate::encode::error::Error;
+use crate::encode::encode::{Encodable, Decodable};
+use crate::block::varint::VarInt;
 
 use crate::primitives::script::Script;
 
@@ -8,8 +9,8 @@ use std::io::{Read, Write, Cursor};
 
 pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Script, Error> {
 
-    let scriptlen = varint::decode(r).map_err(|_| Error::ScriptLen)?;
-    let mut content = vec![0u8; scriptlen as usize];
+    let scriptlen = VarInt::decode(r).map_err(|_| Error::ScriptLen)?;
+    let mut content = vec![0u8; scriptlen.0 as usize];
     let mut content_ref = content.as_mut_slice();
     r.read_exact(&mut content_ref).map_err(|_| Error::ScriptContent)?;
 
@@ -25,7 +26,7 @@ pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Script, Error> {
 mod test {
 
     use crate::block::script;
-    use crate::block::error::Error;
+    use crate::encode::error::Error;
 
     use crate::primitives::script::Script;
 

@@ -1,5 +1,5 @@
 use crate::block::transaction;
-use crate::block::error::Error;
+use crate::encode::error::Error;
 use crate::primitives::block::Block;
 
 use std::io::{Read, Write, Cursor};
@@ -71,7 +71,7 @@ mod test {
 
     use crate::block::block;
     use crate::utils::hexdump;
-    use crate::block::error::Error;
+    use crate::encode::error::Error;
 
     use crate::primitives::block::Block;
     use std::io::Cursor;

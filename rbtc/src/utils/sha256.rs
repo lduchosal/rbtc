@@ -1,5 +1,5 @@
-use crate::network::error::Error;
-use crate::network::encode::{Encodable, Decodable};
+use crate::encode::error::Error;
+use crate::encode::encode::{Encodable, Decodable};
 
 use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};

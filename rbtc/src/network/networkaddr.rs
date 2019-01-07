@@ -1,7 +1,7 @@
 use crate::network::version::Service;
 use crate::network::message::NetworkMessage;
-use crate::network::encode::{Encodable, NetworkEncodable, Decodable, NetworkDecodable};
-use crate::network::error::Error;
+use crate::encode::encode::{Encodable, NetworkEncodable, Decodable, NetworkDecodable};
+use crate::encode::error::Error;
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::io::{Read, Write, Cursor};
@@ -148,9 +148,9 @@ impl Decodable for IpAddr {
 #[cfg(test)]
 mod test {
 
-    use crate::network::error::Error;
+    use crate::encode::error::Error;
     use crate::network::message::NetworkMessage;
-    use crate::network::encode::{Encodable, Decodable};
+    use crate::encode::encode::{Encodable, Decodable};
     use crate::network::networkaddr::NetworkAddr;
     use crate::network::version::Service;
     use crate::utils::hexdump;

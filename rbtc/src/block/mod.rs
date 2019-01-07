@@ -1,4 +1,3 @@
-pub mod error;
 pub mod block;
 pub mod transaction;
 pub (crate) mod varint;

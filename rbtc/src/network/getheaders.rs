@@ -1,9 +1,9 @@
 use crate::network::message::Command;
-use crate::network::error::Error;
+use crate::encode::error::Error;
 use crate::network::message::{NetworkMessage};
-use crate::network::encode::{Encodable, Decodable};
+use crate::encode::encode::{Encodable, Decodable};
 use crate::utils::sha256::Sha256;
-use crate::block::varint;
+use crate::block::varint::VarInt;
 
 use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
@@ -62,8 +62,8 @@ impl Encodable for GetHeadersMessage {
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
         self.version.encode(w).map_err(|_| Error::GetHeadersVersion)?;
-
-        varint::encode(w, self.locators.len() as u64).map_err(|_| Error::GetHeadersLocatorsCount)?;
+        let locators_len = VarInt::new(self.locators.len() as u64);
+        locators_len.encode(w).map_err(|_| Error::GetHeadersLocatorsCount)?;
         for locator in &self.locators {
             let hash = locator.hash;
             w.write_all(&hash).map_err(|_| Error::GetHeadersLocators)?;
@@ -99,9 +99,9 @@ pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<GetHeadersMessage, Error> {
 fn decode_locators(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Sha256>, Error> {
 
     let mut result : Vec<Sha256> = Vec::new();
-    let count = varint::decode(r).map_err(|_| Error::GetHeadersLocatorsCount)?;
+    let count = VarInt::decode(r).map_err(|_| Error::GetHeadersLocatorsCount)?;
 
-    for _ in 0..count {
+    for _ in 0..count.0 {
         let mut hash = [0; 32];
         r.read_exact(&mut hash).map_err(|_| Error::GetHeadersLocator)?;
         let locator = Sha256 {
@@ -117,7 +117,7 @@ fn decode_locators(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Sha256>, Error> {
 mod test {
 
     use crate::network::message::NetworkMessage;
-    use crate::network::encode::{Encodable, Decodable};
+    use crate::encode::encode::{Encodable, Decodable};
     use crate::network::getheaders;
     use crate::network::getheaders::GetHeadersMessage;
     use crate::network::getheaders::Error;

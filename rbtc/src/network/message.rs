@@ -1,5 +1,5 @@
-use crate::network::error::Error;
-use crate::network::encode::{Encodable, Decodable};
+use crate::encode::error::Error;
+use crate::encode::encode::{Encodable, Decodable};
 
 use sha2::{Sha256, Digest};
 
@@ -172,7 +172,7 @@ mod test {
     use crate::network::message::Message;
     use crate::network::message::Error;
     use crate::network::message::NetworkMessage;
-    use crate::network::encode::{Encodable, Decodable};
+    use crate::encode::encode::{Encodable, Decodable};
     
     use crate::network::getaddr::GetAddr;
 

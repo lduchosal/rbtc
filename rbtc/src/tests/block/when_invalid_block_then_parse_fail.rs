@@ -1,5 +1,5 @@
 
-use crate::block::error::Error;
+use crate::encode::error::Error;
 use crate::block::block;
 use crate::utils::hexdump;
 

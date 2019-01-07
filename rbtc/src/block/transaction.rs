@@ -1,5 +1,6 @@
-use crate::block::error::Error;
-use crate::block::varint;
+use crate::encode::error::Error;
+use crate::encode::encode::{Encodable, Decodable};
+use crate::block::varint::VarInt;
 use crate::block::txin;
 use crate::block::txout;
 use crate::block::witness;
@@ -80,9 +81,9 @@ pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, Error> {
 pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Transaction>, Error> {
 
     let mut result : Vec<Transaction> = Vec::new();
-    let count = varint::decode(r).map_err(|_| Error::TransactionsCount)?;
+    let count = VarInt::decode(r).map_err(|_| Error::TransactionsCount)?;
 
-    for _ in 0..count {
+    for _ in 0..count.0 {
         let transaction = decode(r)?;
         result.push(transaction);
     }

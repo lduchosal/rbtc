@@ -3,7 +3,7 @@ use rbtc::network::version::Version;
 use rbtc::network::version::Service;
 use rbtc::network::message::NetworkMessage;
 use rbtc::network::message::{Message, Magic};
-use rbtc::network::encode::{Encodable, Decodable};
+use rbtc::encode::encode::{Encodable, Decodable};
 
 use rbtc::utils::hexdump;
 
