@@ -1,11 +1,14 @@
 use crate::encode::error::Error;
 use crate::encode::encode::{Encodable, Decodable};
 use crate::block::varint::VarInt;
-use crate::primitives::witness::Witness;
 
 use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 
+#[derive(Debug)]
+pub struct Witness {
+    pub data: Vec<u8>
+}
 
 pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Witness>, Error> {
     let mut result: Vec<Witness> = Vec::new();
@@ -35,7 +38,7 @@ mod test {
 
     use crate::encode::error::Error;
     use crate::block::witness;
-    use crate::primitives::witness::Witness;
+    use crate::block::witness::Witness;
 
     use std::io::Cursor;
 

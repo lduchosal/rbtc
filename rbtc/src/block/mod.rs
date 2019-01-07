@@ -1,7 +1,8 @@
 pub mod block;
 pub mod transaction;
-pub (crate) mod varint;
-mod txin;
-mod txout;
-mod script;
-mod witness;
+pub mod varint;
+pub mod txin;
+pub mod txout;
+pub mod script;
+pub mod witness;
+pub mod outpoint;

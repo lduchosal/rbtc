@@ -5,7 +5,9 @@ use crate::block::txin;
 use crate::block::txout;
 use crate::block::witness;
 
-use crate::primitives::transaction::Transaction;
+use crate::block::txout::TxOut;
+use crate::block::txin::TxIn;
+use crate::block::witness::Witness;
 
 use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
@@ -42,12 +44,29 @@ use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 /// |                 |  when transaction is final                   |                              | 
 /// +-----------------+----------------------------------------------+------------------------------+ 
 /// 
+// https://github.com/bitcoin/bitcoin/blob/master/src/primitives/transaction.h
+//
+// /** The basic transaction that is broadcasted on the network and contained in
+//  * blocks.  A transaction can contain multiple inputs and outputs.
+//  */
+// class CTransaction
+// {
+#[derive(Debug)]
+pub struct Transaction {
+    pub version: i32,
+    pub flag: Option<u16>,
+    pub inputs: Vec<TxIn>,
+    pub outputs: Vec<TxOut>,
+    pub witness: Option<Vec<Witness>>,
+    pub locktime: u32
+}
+
 pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, Error> {
 
-    let version = r.read_i32::<LittleEndian>().map_err(|_| Error::TransactionVersion)?;
+    let version = i32::decode(r).map_err(|_| Error::TransactionVersion)?;
 
     let position = r.position();
-    let flag = r.read_u16::<LittleEndian>()
+    let flag = u16::decode(r)
         .map(|v| match v { 0x0100 => Some(v), _ => None })
         .map_err(|_| Error::TransactionFlag)?;
     
@@ -63,7 +82,7 @@ pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, Error> {
         _ => None
     };
 
-    let locktime = r.read_u32::<LittleEndian>().map_err(|_| Error::TransactionLockTime)?;
+    let locktime = u32::decode(r).map_err(|_| Error::TransactionLockTime)?;
 
     let result = Transaction {
         version: version,
@@ -76,7 +95,6 @@ pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, Error> {
     
     Ok(result)
 }
-
 
 pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Transaction>, Error> {
 

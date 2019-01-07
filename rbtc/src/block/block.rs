@@ -1,9 +1,21 @@
 use crate::block::transaction;
 use crate::encode::error::Error;
-use crate::primitives::block::Block;
+use crate::block::transaction::Transaction;
 
 use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, ReadBytesExt};
+
+#[derive(Debug)]
+pub struct Block {
+    // header
+    pub version: u32,
+    pub previous: [u8; 32],
+    pub merkleroot: [u8; 32],
+    pub time: u32,
+    pub bits: u32,
+    pub nonce: u32,
+    pub transactions: Vec<Transaction>
+}
 
 pub fn parse(hex: &Vec<u8>) -> Result<Block, Error> {
 
@@ -73,7 +85,7 @@ mod test {
     use crate::utils::hexdump;
     use crate::encode::error::Error;
 
-    use crate::primitives::block::Block;
+    use crate::block::block::Block;
     use std::io::Cursor;
 
     #[test]

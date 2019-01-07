@@ -2,10 +2,12 @@ use crate::encode::error::Error;
 use crate::encode::encode::{Encodable, Decodable};
 use crate::block::varint::VarInt;
 
-use crate::primitives::script::Script;
-
 use std::io::{Read, Write, Cursor};
 
+#[derive(Debug)]
+pub struct Script {
+    pub content: Vec<u8>
+}
 
 pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Script, Error> {
 
@@ -28,7 +30,7 @@ mod test {
     use crate::block::script;
     use crate::encode::error::Error;
 
-    use crate::primitives::script::Script;
+    use crate::block::script::Script;
 
     use std::io::Cursor;
 

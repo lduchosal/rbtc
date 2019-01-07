@@ -1,7 +1,7 @@
-use crate::primitives::outpoint::OutPoint;
-use crate::primitives::transaction::Transaction;
-use crate::primitives::txin::TxIn;
-use crate::primitives::txout::TxOut;
+use crate::block::outpoint::OutPoint;
+use crate::block::transaction::Transaction;
+use crate::block::txin::TxIn;
+use crate::block::txout::TxOut;
 use crate::block::block;
 use crate::utils::hexdump;
 
