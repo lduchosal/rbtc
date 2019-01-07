@@ -71,7 +71,7 @@ mod test {
     #[test]
     fn when_decode_getaddr_then_nothing_to_encode() {
 
-        let mut data : Vec<u8> = Vec::new();
+        let data : Vec<u8> = Vec::new();
         let mut read = Cursor::new(&data);
         let result = GetAddr::decode(&mut read);
 

@@ -7,8 +7,16 @@ pub trait Encodable {
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error>;
 }
 
+pub trait NetworkEncodable {
+    fn encode_network_byte_order(&self, w: &mut Vec<u8>) -> Result<(), Error>;
+}
+
 pub trait Decodable : Sized {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Self, Error>;
+}
+
+pub trait NetworkDecodable : Sized {
+    fn decode_network_byte_order(r: &mut Cursor<&Vec<u8>>) -> Result<Self, Error>;
 }
 
 impl Encodable for i64 {
@@ -24,7 +32,6 @@ impl Decodable for i64 {
         Ok(result)
     }
 }
-
 
 impl Encodable for i32 {
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
@@ -111,6 +118,22 @@ impl Decodable for u16 {
         Ok(result)
     }
 }
+
+impl NetworkEncodable for u16 {
+    fn encode_network_byte_order(&self, w: &mut Vec<u8>) -> Result<(), Error> {
+        w.write_u16::<BigEndian>(*self).map_err(|_| Error::WriteU16)?;
+        Ok(())
+    }
+}
+
+impl NetworkDecodable for u16 {
+
+    fn decode_network_byte_order(r: &mut Cursor<&Vec<u8>>) -> Result<u16, Error> {
+        let result = r.read_u16::<BigEndian>().map_err(|_| Error::ReadU16)?;
+        Ok(result)
+    }
+}
+
 
 impl Encodable for u8 {
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {

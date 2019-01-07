@@ -137,7 +137,6 @@ mod test {
         }
     }
 
-
     #[test]
     fn when_decode_with_36_vec_then_fail_parse_error_blockmerkleroot() {
 
@@ -183,7 +182,6 @@ mod test {
             panic!("should have failed");
         }
     }
-
 
     #[test]
     fn when_decode_with_68_vec_then_fail_parse_error_bits() {
@@ -232,7 +230,6 @@ mod test {
             panic!("should have failed");
         }
     }
-
 
     #[test]
     fn when_decode_with_68_vec_then_fail_parse_error_transaction_count() {

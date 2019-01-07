@@ -135,6 +135,41 @@ impl Encodable for Version {
     }
 }
 
+impl Decodable for Version {
+
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Version, Error> {
+
+        let version = i32::decode(r).map_err(|_| Error::VersionVersion)?;
+        let services = Service::decode(r).map_err(|_| Error::VersionServices)?;
+        let timestamp = i64::decode(r).map_err(|_| Error::VersionTimestamp)?;
+        let receiver = NetworkAddr::decode(r).map_err(|_| Error::VersionReceiver)?;
+        let sender = NetworkAddr::decode(r).map_err(|_| Error::VersionSender)?;
+        let nonce = u64::decode(r).map_err(|_| Error::VersionNonce)?;
+
+        let user_agent_len = u8::decode(r).map_err(|_| Error::VersionUserAgentLen)?;
+        let mut user_agent_vec = vec![0u8; user_agent_len as usize];
+        let user_agent_bytes = user_agent_vec.as_mut_slice();
+
+        r.read_exact(user_agent_bytes).map_err(|_| Error::VersionUserAgent)?;
+        let user_agent = String::from_utf8(user_agent_bytes.to_owned()).map_err(|_| Error::VersionUserAgentDecode)?;
+        let start_height = i32::decode(r).map_err(|_| Error::VersionStartHeight)?;
+        let relay = bool::decode(r).map_err(|_| Error::VersionRelay)?;
+
+        let result = Version {
+            version: version,
+            services: services,
+            timestamp: timestamp,
+            receiver: receiver,
+            sender: sender,
+            nonce: nonce,
+            user_agent: user_agent,
+            start_height: start_height,
+            relay: relay,
+        };
+        Ok(result)
+    }
+}
+
 #[cfg(test)]
 mod test {
 
@@ -145,6 +180,7 @@ mod test {
     use crate::network::encode::{Encodable, Decodable};
     use crate::utils::hexdump;
 
+    use std::io::{Write, Read, Cursor};
     use std::net::IpAddr;
 
      #[test]
@@ -161,22 +197,20 @@ mod test {
 
         // This message is from a satoshi node, morning of May 27 2014
         let original : Vec<u8> = hexdump::decode(dump);
-        let service = Service::Network;
-        let ip_receiver = IpAddr::V4("0.0.0.0".parse().unwrap());
 
         let version = Version {
             version: 70002,
             services: Service::Network,
             timestamp: 1401217254,
             receiver: NetworkAddr {
-                services: service.clone(),
-                ip: ip_receiver,
+                services: Service::Network,
+                ip: IpAddr::V4("0.0.0.0".parse().unwrap()),
                 port: 0
             },
             sender: NetworkAddr {
-                services: service,
-                ip: ip_receiver,
-                port: 0
+                services: Service::Network,
+                ip: IpAddr::V6("fd87:d87e:eb43:64f2:2cf5:4dca:5941:2db7".parse().unwrap()),
+                port: 8333
             },
             nonce: 0xE83EE8FCCF20D947,
             user_agent: "/Satoshi:0.9.99/".to_string(),
@@ -189,5 +223,31 @@ mod test {
         assert!(encoded.is_ok());
 
         assert_eq!(original, result);
+    }
+
+     #[test]
+    fn when_encode_decode_version_message_then_message_equal() {
+        let dump = "
+00000000   72 11 01 00 01 00 00 00  00 00 00 00 e6 e0 84 53   ver.service.time
+00000000   00 00 00 00 01 00 00 00  00 00 00 00 00 00 00 00   ................
+00000000   00 00 00 00 00 00 ff ff  00 00 00 00 00 00 01 00   ................
+00000000   00 00 00 00 00 00 fd 87  d8 7e eb 43 64 f2 2c f5   ................
+00000000   4d ca 59 41 2d b7 20 8d  47 d9 20 cf fc e8 3e e8   .........nonce..
+00000000   10 2f 53 61 74 6f 73 68  69 3a 30 2e 39 2e 39 39   .useragent......
+00000000   2f 2c 9f 04 00 01                                  height.relay.   
+";
+
+        // This message is from a satoshi node, morning of May 27 2014
+        let original : Vec<u8> = hexdump::decode(dump);
+        let mut r = Cursor::new(&original);
+        let decoded_result = Version::decode(&mut r);
+        assert!(decoded_result.is_ok());
+
+        let decoded = decoded_result.unwrap();
+        let mut reencoded : Vec<u8> = Vec::new();
+        let encode_result = decoded.encode(&mut reencoded);
+        assert!(encode_result.is_ok());
+
+        assert_eq!(original, reencoded);
     }
 }

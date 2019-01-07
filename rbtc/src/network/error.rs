@@ -48,6 +48,7 @@ pub enum Error {
     VersionSender,
     VersionNonce,
     VersionUserAgent,
+    VersionUserAgentDecode,
     VersionUserAgentLen,
     VersionStartHeight,
     VersionRelay,

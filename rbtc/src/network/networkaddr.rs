@@ -1,6 +1,6 @@
 use crate::network::version::Service;
 use crate::network::message::NetworkMessage;
-use crate::network::encode::{Encodable, Decodable};
+use crate::network::encode::{Encodable, NetworkEncodable, Decodable, NetworkDecodable};
 use crate::network::error::Error;
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -61,7 +61,7 @@ impl Encodable for NetworkAddr {
 
         self.services.encode(w).map_err(|_| Error::NetworkAddrServices)?;
         self.ip.encode(w).map_err(|_| Error::NetworkAddrIp)?;
-        self.port.encode(w).map_err(|_| Error::NetworkAddrPort)?;
+        self.port.encode_network_byte_order(w).map_err(|_| Error::NetworkAddrPort)?;
         Ok(())
     }
 }
@@ -81,7 +81,7 @@ impl Decodable for NetworkAddr {
 
         let services = Service::decode(r).map_err(|_| Error::NetworkAddrServices)?;
         let ip = IpAddr::decode(r).map_err(|_| Error::NetworkAddrIp)?;
-        let port = r.read_u16::<BigEndian>().map_err(|_| Error::NetworkAddrPort)?;
+        let port = u16::decode_network_byte_order(r).map_err(|_| Error::NetworkAddrPort)?;
 
         let result = NetworkAddr {
             services: services,
@@ -125,14 +125,14 @@ impl Encodable for IpAddr {
 impl Decodable for IpAddr {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<IpAddr, Error> {
 
-        let b1 = r.read_u16::<BigEndian>().map_err(|_| Error::IpAddrB1)?;
-        let b2 = r.read_u16::<BigEndian>().map_err(|_| Error::IpAddrB2)?;
-        let b3 = r.read_u16::<BigEndian>().map_err(|_| Error::IpAddrB3)?;
-        let b4 = r.read_u16::<BigEndian>().map_err(|_| Error::IpAddrB4)?;
-        let b5 = r.read_u16::<BigEndian>().map_err(|_| Error::IpAddrB5)?;
-        let b6 = r.read_u16::<BigEndian>().map_err(|_| Error::IpAddrB6)?;
-        let b7 = r.read_u16::<BigEndian>().map_err(|_| Error::IpAddrB7)?;
-        let b8 = r.read_u16::<BigEndian>().map_err(|_| Error::IpAddrB8)?;
+        let b1 = u16::decode_network_byte_order(r).map_err(|_| Error::IpAddrB1)?;
+        let b2 = u16::decode_network_byte_order(r).map_err(|_| Error::IpAddrB2)?;
+        let b3 = u16::decode_network_byte_order(r).map_err(|_| Error::IpAddrB3)?;
+        let b4 = u16::decode_network_byte_order(r).map_err(|_| Error::IpAddrB4)?;
+        let b5 = u16::decode_network_byte_order(r).map_err(|_| Error::IpAddrB5)?;
+        let b6 = u16::decode_network_byte_order(r).map_err(|_| Error::IpAddrB6)?;
+        let b7 = u16::decode_network_byte_order(r).map_err(|_| Error::IpAddrB7)?;
+        let b8 = u16::decode_network_byte_order(r).map_err(|_| Error::IpAddrB8)?;
 
         let ipv6 = Ipv6Addr::new(b1, b2, b3, b4, b5, b6, b7, b8);
         let ipaddr = match ipv6.to_ipv4() {
@@ -196,7 +196,7 @@ mod test {
 ";
 
         // This message is from a satoshi node, morning of May 27 2014
-        let original : Vec<u8> = hexdump::parse(dump);
+        let original : Vec<u8> = hexdump::decode(dump);
         let ip = IpAddr::V4("10.0.0.1".parse().unwrap());
         let port = 8333;
         let service = Service::Network;
@@ -278,7 +278,7 @@ mod test {
 00000010   2C F5 4D CA 59 41 2D B7  20 8D                     ..........
 ";
 
-        let original : Vec<u8> = hexdump::parse(dump);
+        let original : Vec<u8> = hexdump::decode(dump);
         let ip = IpAddr::V6("FD87:D87E:EB43:64F2:2CF5:4DCA:5941:2DB7".parse().unwrap());
         let port = 8333;
         let service = Service::Network;
