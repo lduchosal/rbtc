@@ -6,8 +6,9 @@ use crate::block::witness;
 
 use crate::primitives::transaction::Transaction;
 
-use std::io::Cursor;
-use byteorder::{LittleEndian, ReadBytesExt};
+use std::io::{Read, Write, Cursor};
+use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
+
 
 /// 
 /// https://en.bitcoin.it/wiki/Transaction

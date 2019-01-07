@@ -5,9 +5,9 @@ use crate::block::varint;
 use crate::primitives::outpoint::OutPoint;
 use crate::primitives::txin::TxIn;
 
-use std::io::Read;
-use std::io::Cursor;
-use byteorder::{LittleEndian, ReadBytesExt};
+use std::io::{Read, Write, Cursor};
+use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
+
 
 
 pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxIn>, Error> {

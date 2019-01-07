@@ -2,8 +2,9 @@ use crate::block::error::Error;
 use crate::block::varint;
 use crate::primitives::witness::Witness;
 
-use std::io::Cursor;
-use std::io::Read;
+use std::io::{Read, Write, Cursor};
+use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
+
 
 pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Witness>, Error> {
     let mut result: Vec<Witness> = Vec::new();

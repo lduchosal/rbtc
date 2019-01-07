@@ -1,10 +1,11 @@
-use crate::network::message::{NetworkMessage, Encodable};
+use crate::network::message::{NetworkMessage};
+use crate::network::encode::{Encodable, Decodable};
 use crate::network::networkaddr::NetworkAddr;
 use crate::network::error::Error;
 use crate::network::message::Command;
 
-use std::io::{Write};
-use byteorder::{LittleEndian, WriteBytesExt};
+use std::io::{Write, Read, Cursor};
+use byteorder::{LittleEndian, WriteBytesExt, ReadBytesExt};
 
 /// The `version` message
 /// https://en.bitcoin.it/wiki/Protocol_documentation#version
@@ -66,7 +67,7 @@ pub struct Version {
 /// | 1024  | NODE_NETWORK_LIMITED | See BIP 0159                                                    |
 /// +-------+----------------------+-----------------------------------------------------------------+
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Service {
     Network = 1,
     GetUtxo = 2,
@@ -75,10 +76,30 @@ pub enum Service {
     NetworkLimited = 1024,
 }
 
+impl Service {
+    pub fn from_value(value :u64) -> Result<Service, Error> {
+        match value {
+            1 => Ok(Service::Network),
+            2 => Ok(Service::GetUtxo),
+            4 => Ok(Service::Bloom),
+            8 => Ok(Service::Witness),
+            1024 => Ok(Service::NetworkLimited),
+            _ => Err(Error::ServiceMatch)
+        }
+    }
+}
+
 impl Encodable for Service {
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
         w.write_u64::<LittleEndian>(self.clone() as u64).map_err(|_| Error::Service)?;
         Ok(())
+    }
+}
+
+impl Decodable for Service {
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Service, Error> {
+        let value = r.read_u64::<LittleEndian>().map_err(|_| Error::Service)?;
+        Service::from_value(value)
     }
 }
 
@@ -95,7 +116,6 @@ impl Encodable for Version {
 
         w.write_i32::<LittleEndian>(self.version).map_err(|_| Error::VersionVersion)?;
         self.services.encode(w).map_err(|_| Error::VersionServices)?;
-        //w.write_u64::<LittleEndian>(self.services.clone() as u64).map_err(|_| Error::VersionServices)?;
         w.write_i64::<LittleEndian>(self.timestamp).map_err(|_| Error::VersionTimestamp)?;
         self.receiver.encode(w).map_err(|_| Error::VersionReceiver)?;
         self.sender.encode(w).map_err(|_| Error::VersionSender)?;
@@ -117,8 +137,8 @@ mod test {
     use crate::network::version::Version;
     use crate::network::version::Service;
     use crate::network::networkaddr::NetworkAddr;
-    use crate::network::message::Encodable;
     use crate::network::message::NetworkMessage;
+    use crate::network::encode::{Encodable, Decodable};
     use crate::utils::hexdump;
 
     use std::net::IpAddr;

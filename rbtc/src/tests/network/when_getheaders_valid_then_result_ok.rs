@@ -4,7 +4,9 @@ use crate::network::getheaders::GetHeadersMessage;
 use crate::network::getheaders;
 use crate::utils::hexdump;
 
-use std::io::Cursor;
+use std::io::{Read, Write, Cursor};
+use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
+
 
 #[test]
 fn test() {

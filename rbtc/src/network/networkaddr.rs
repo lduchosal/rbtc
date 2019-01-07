@@ -1,10 +1,12 @@
 use crate::network::version::Service;
-use crate::network::message::{Encodable, Decodable};
+use crate::network::message::NetworkMessage;
+use crate::network::encode::{Encodable, Decodable};
 use crate::network::error::Error;
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::io::{Write, Read};
-use byteorder::{LittleEndian, BigEndian, WriteBytesExt, ReadBytesExt};
+use std::io::{Read, Write, Cursor};
+use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
+
 
 /// https://en.bitcoin.it/wiki/Protocol_documentation#Network_address
 /// 
@@ -40,14 +42,14 @@ use byteorder::{LittleEndian, BigEndian, WriteBytesExt, ReadBytesExt};
 ///  00 00 00 00 00 00 00 00 00 00 FF FF 0A 00 00 01 - IPv6: ::ffff:a00:1 or IPv4: 10.0.0.1
 ///  20 8D                                           - Port 8333
 /// 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct NetworkAddr {
     pub services: Service,
     pub ip: IpAddr,
     pub port: u16
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct TimedNetworkAddr {
     pub time: u32,
     pub addr: NetworkAddr,
@@ -57,9 +59,6 @@ impl Encodable for NetworkAddr {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
-        if let Some(time) = self.time {
-            w.write_u32::<LittleEndian>(time).map_err(|_| Error::NetworkAddrTime)?;
-        }
         self.services.encode(w).map_err(|_| Error::NetworkAddrServices)?;
         self.ip.encode(w).map_err(|_| Error::NetworkAddrIp)?;
         w.write_u16::<BigEndian>(self.port).map_err(|_| Error::NetworkAddrPort)?;
@@ -71,23 +70,21 @@ impl Encodable for NetworkAddr {
 impl Encodable for TimedNetworkAddr {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
-        w.write_u32::<LittleEndian>(time).map_err(|_| Error::TimedNetworkAddrTime)?;
-        networkaddr.encode(w)?;
+        w.write_u32::<LittleEndian>(self.time).map_err(|_| Error::TimedNetworkAddrTime)?;
+        self.addr.encode(w)?;
         Ok(())
     }
 }
 
 impl Decodable for NetworkAddr {
 
-    fn decode(r: &mut Vec<u8>) -> Result<NetworkAddr, Error> {
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<NetworkAddr, Error> {
 
-        let service = Service::decode(r).map_err(|_| Error::NetworkAddrServices)?;
-        // let ip = IpAddr::decode(r).map_err(|_| Error::NetworkAddrIp)?;
-        let ip = IpAddr::From("0.0.0.0".parse().unwrap()).map_err(|_| Error::NetworkAddrIp)?;
+        let services = Service::decode(r).map_err(|_| Error::NetworkAddrServices)?;
+        let ip = IpAddr::decode(r).map_err(|_| Error::NetworkAddrIp)?;
         let port = r.read_u16::<BigEndian>().map_err(|_| Error::NetworkAddrPort)?;
 
         let result = NetworkAddr {
-            time: time,
             services: services,
             ip: ip,
             port: port
@@ -100,7 +97,7 @@ impl Decodable for NetworkAddr {
 
 impl Decodable for TimedNetworkAddr {
 
-    fn decode(r: &mut Vec<u8>) -> Result<TimedNetworkAddr, Error> {
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TimedNetworkAddr, Error> {
 
         let time = r.read_u32::<LittleEndian>().map_err(|_| Error::TimedNetworkAddrTime)?;
         let addr = NetworkAddr::decode(r)?;
@@ -126,15 +123,41 @@ impl Encodable for IpAddr {
     }
 }
 
+impl Decodable for IpAddr {
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<IpAddr, Error> {
+
+        let b1 = r.read_u16::<BigEndian>().map_err(|_| Error::IpAddrB1)?;
+        let b2 = r.read_u16::<BigEndian>().map_err(|_| Error::IpAddrB2)?;
+        let b3 = r.read_u16::<BigEndian>().map_err(|_| Error::IpAddrB3)?;
+        let b4 = r.read_u16::<BigEndian>().map_err(|_| Error::IpAddrB4)?;
+        let b5 = r.read_u16::<BigEndian>().map_err(|_| Error::IpAddrB5)?;
+        let b6 = r.read_u16::<BigEndian>().map_err(|_| Error::IpAddrB6)?;
+        let b7 = r.read_u16::<BigEndian>().map_err(|_| Error::IpAddrB7)?;
+        let b8 = r.read_u16::<BigEndian>().map_err(|_| Error::IpAddrB8)?;
+
+        let ipv6 = Ipv6Addr::new(b1, b2, b3, b4, b5, b6, b7, b8);
+        let ipaddr = match ipv6.to_ipv4() {
+            Some(ipv4) => IpAddr::V4(ipv4),
+            None => IpAddr::V6(ipv6)
+        };
+
+        Ok(ipaddr)
+    }
+}
+
 
 #[cfg(test)]
 mod test {
 
     use crate::network::error::Error;
-    use crate::network::message::{Encodable, Decodable};
+    use crate::network::message::NetworkMessage;
+    use crate::network::encode::{Encodable, Decodable};
     use crate::network::networkaddr::NetworkAddr;
     use crate::network::version::Service;
     use crate::utils::hexdump;
+
+    use std::io::{Read, Write, Cursor};
+    use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 
     use std::net::{IpAddr};
 
@@ -185,11 +208,11 @@ mod test {
             port: port
         };
 
-        let mut data : Vec<u8> = Vec::new();
-        let result = NetworkAddr::decode(&mut data);
+        let mut read = Cursor::new(&original);
+        let result = NetworkAddr::decode(&mut read);
 
         assert!(result.is_ok());
-        assert_eq!(expected, data);
+        assert_eq!(expected, result.unwrap());
     }
 
 
@@ -247,4 +270,31 @@ mod test {
 
     }
 
+    
+    #[test]
+    fn when_decode_addr_ipv6_port_8333_then_same_as_hexdump() {
+
+        let dump = "
+00000000   01 00 00 00 00 00 00 00  FD 87 D8 7E EB 43 64 F2   ................
+00000010   2C F5 4D CA 59 41 2D B7  20 8D                     ..........
+";
+
+        let original : Vec<u8> = hexdump::parse(dump);
+        let ip = IpAddr::V6("FD87:D87E:EB43:64F2:2CF5:4DCA:5941:2DB7".parse().unwrap());
+        let port = 8333;
+        let service = Service::Network;
+
+        let expected = NetworkAddr {
+            services: service,
+            ip: ip,
+            port: port
+        };
+
+        let mut data = Cursor::new(&original);
+        let result = NetworkAddr::decode(&mut data);
+
+        assert!(result.is_ok());
+        assert_eq!(expected, result.unwrap());
+
+    }
 }

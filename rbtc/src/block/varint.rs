@@ -1,7 +1,8 @@
 use crate::block::error::Error;
 
 use std::io::Cursor;
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
+
 
 
 /// https://en.bitcoin.it/wiki/Protocol_documentation#Transaction_Verification
@@ -73,7 +74,10 @@ mod test {
 
     use crate::block::varint;
     use crate::block::varint::Error;
-    use std::io::Cursor;
+    
+    use std::io::{Read, Write, Cursor};
+    use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
+
 
     #[test]
     fn when_decode_varint_0x00_then_1_byte() {

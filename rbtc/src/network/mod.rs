@@ -3,4 +3,5 @@ pub mod getheaders;
 pub mod message;
 pub mod version;
 pub mod error;
+pub mod encode;
 pub mod networkaddr;

@@ -1,12 +1,13 @@
 use crate::network::message::Command;
 use crate::network::error::Error;
-use crate::network::message::{NetworkMessage, Encodable};
+use crate::network::message::{NetworkMessage};
+use crate::network::encode::{Encodable, Decodable};
 use crate::utils::sha256::Sha256;
 use crate::block::varint;
 
-use std::io::{Read, Write};
-use std::io::Cursor;
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use std::io::{Read, Write, Cursor};
+use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
+
 
 /// https://github.com/rust-bitcoin/rust-bitcoin/blob/45140a3251d9eca8d17baf7a4e900a4ac5baae3b/src/network/message_blockdata.rs
 /// The `getheaders` message
@@ -115,7 +116,8 @@ fn decode_locators(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Sha256>, Error> {
 #[cfg(test)]
 mod test {
 
-    use crate::network::message::Encodable;
+    use crate::network::message::NetworkMessage;
+    use crate::network::encode::{Encodable, Decodable};
     use crate::network::getheaders;
     use crate::network::getheaders::GetHeadersMessage;
     use crate::network::getheaders::Error;

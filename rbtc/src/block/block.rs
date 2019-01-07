@@ -2,8 +2,7 @@ use crate::block::transaction;
 use crate::block::error::Error;
 use crate::primitives::block::Block;
 
-use std::io::Read;
-use std::io::Cursor;
+use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, ReadBytesExt};
 
 pub fn parse(hex: &Vec<u8>) -> Result<Block, Error> {

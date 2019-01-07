@@ -2,7 +2,9 @@ use rbtc::network::getaddr::GetAddr;
 use rbtc::network::networkaddr::NetworkAddr;
 use rbtc::network::version::Version;
 use rbtc::network::version::Service;
-use rbtc::network::message::{Encodable, Message, Magic};
+use rbtc::network::message::NetworkMessage;
+use rbtc::network::message::{Message, Magic};
+use rbtc::network::encode::{Encodable, Decodable};
 
 use std::net::{Shutdown, TcpStream, IpAddr};
 use std::io::prelude::*;
@@ -75,13 +77,11 @@ impl NodeWalker {
                 services: Service::Network,
                 timestamp: 1401217254,
                 receiver: NetworkAddr {
-                    time: None,
                     services: Service::Network,
                     ip: IpAddr::V4("0.0.0.0".parse().unwrap()),
                     port: 0
                 }, //[ 1, 0, 0, 0, 0, 0, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ],
                 sender: NetworkAddr {
-                    time: None,
                     services: Service::Network,
                     ip: IpAddr::V6("FD87:D87E:EB43:64F2:2CF5:4DCA:5941:2DB7".parse().unwrap()),
                     port: 8333

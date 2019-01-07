@@ -1,9 +1,12 @@
 use crate::network::error::Error;
+use crate::network::encode::{Encodable, Decodable};
+
 use sha2::{Sha256, Digest};
 
 use std::fmt;
-use std::io::{Write};
-use byteorder::{LittleEndian, WriteBytesExt};
+use std::io::{Read, Write, Cursor};
+use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
+
 
 /// https://en.bitcoin.it/wiki/Protocol_documentation <br/>
 /// Known magic values:
@@ -79,14 +82,6 @@ pub trait NetworkMessage : Encodable {
     fn command(&self) -> Command;
 }
 
-pub trait Encodable {
-    fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error>;
-}
-
-pub trait Decodable : Sized {
-    fn decode(r: &mut Vec<u8>) -> Result<Self, Error>;
-}
-
 #[derive(Debug)]
 pub enum Command {
     Version,
@@ -127,7 +122,7 @@ impl fmt::Display for Command {
     }
 }
 
-impl<'a> crate::network::message::Encodable for Message<'a> {
+impl<'a> Encodable for Message<'a> {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
@@ -174,7 +169,8 @@ mod test {
     use crate::network::message::Command;
     use crate::network::message::Message;
     use crate::network::message::Error;
-    use crate::network::message::{NetworkMessage, Encodable};
+    use crate::network::message::NetworkMessage;
+    use crate::network::encode::{Encodable, Decodable};
     
     use crate::network::getaddr::GetAddr;
 

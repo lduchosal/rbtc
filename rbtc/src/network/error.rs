@@ -1,6 +1,9 @@
 
 #[derive(PartialEq, Debug)]
 pub enum Error {
+
+    WriteI64,
+    
     MessageMagic,
     MessageMagicReverse,
     MessageCommand,
@@ -33,5 +36,15 @@ pub enum Error {
     TimedNetworkAddrTime,
 
     Service,
-    IpAddr
+    ServiceMatch,
+
+    IpAddr,
+    IpAddrB1,
+    IpAddrB2,
+    IpAddrB3,
+    IpAddrB4,
+    IpAddrB5,
+    IpAddrB6,
+    IpAddrB7,
+    IpAddrB8,
 }

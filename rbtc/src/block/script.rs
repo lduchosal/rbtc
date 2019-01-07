@@ -3,8 +3,8 @@ use crate::block::varint;
 
 use crate::primitives::script::Script;
 
-use std::io::Read;
-use std::io::Cursor;
+use std::io::{Read, Write, Cursor};
+
 
 pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Script, Error> {
 
