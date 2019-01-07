@@ -1,4 +1,4 @@
-use crate::block::error::DecodeError;
+use crate::block::error::Error;
 use crate::block::script;
 use crate::block::varint;
 
@@ -10,10 +10,10 @@ use std::io::Cursor;
 use byteorder::{LittleEndian, ReadBytesExt};
 
 
-pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxIn>, DecodeError> {
+pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxIn>, Error> {
 
     let mut result : Vec<TxIn> = Vec::new();
-    let count = varint::decode(r).map_err(|_| DecodeError::InputsCount)?;
+    let count = varint::decode(r).map_err(|_| Error::InputsCount)?;
     for _ in 0..count {
         let input = decode(r)?;
         result.push(input);
@@ -22,11 +22,11 @@ pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxIn>, DecodeEr
     Ok(result)
 }
 
-pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxIn, DecodeError> {
+pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxIn, Error> {
 
     let mut transaction_hash = [0; 32];
-    r.read_exact(&mut transaction_hash).map_err(|_| DecodeError::TxInTransactionHash)?;
-    let index = r.read_u32::<LittleEndian>().map_err(|_| DecodeError::TxInIndex)?;
+    r.read_exact(&mut transaction_hash).map_err(|_| Error::TxInTransactionHash)?;
+    let index = r.read_u32::<LittleEndian>().map_err(|_| Error::TxInIndex)?;
     let previous = OutPoint {
         transaction_hash: transaction_hash,
         index: index,
@@ -35,12 +35,12 @@ pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxIn, DecodeError> {
     let signature = script::decode(r)
         .map_err(|e| {
             match e {
-                DecodeError::ScriptContent => DecodeError::SignatureScriptContent,
-                DecodeError::ScriptLen => DecodeError::SignatureScriptLen,
+                Error::ScriptContent => Error::SignatureScriptContent,
+                Error::ScriptLen => Error::SignatureScriptLen,
                 _ => e
             }
         })?;
-    let sequence = r.read_u32::<LittleEndian>().map_err(|_| DecodeError::TxInSequence)?;
+    let sequence = r.read_u32::<LittleEndian>().map_err(|_| Error::TxInSequence)?;
 
     let result = TxIn {
         previous: previous,

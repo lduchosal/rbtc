@@ -1,6 +1,6 @@
 use crate::network::message::{NetworkMessage, Encodable};
 use crate::network::networkaddr::NetworkAddr;
-use crate::network::error::EncodeError;
+use crate::network::error::Error;
 use crate::network::message::Command;
 
 use std::io::{Write};
@@ -76,8 +76,8 @@ pub enum Service {
 }
 
 impl Encodable for Service {
-    fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError> {
-        w.write_u64::<LittleEndian>(self.clone() as u64).map_err(|_| EncodeError::Service)?;
+    fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
+        w.write_u64::<LittleEndian>(self.clone() as u64).map_err(|_| Error::Service)?;
         Ok(())
     }
 }
@@ -91,21 +91,21 @@ impl NetworkMessage for Version {
 
 impl Encodable for Version {
 
-    fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError> {
+    fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
-        w.write_i32::<LittleEndian>(self.version).map_err(|_| EncodeError::VersionVersion)?;
-        self.services.encode(w).map_err(|_| EncodeError::VersionServices)?;
-        //w.write_u64::<LittleEndian>(self.services.clone() as u64).map_err(|_| EncodeError::VersionServices)?;
-        w.write_i64::<LittleEndian>(self.timestamp).map_err(|_| EncodeError::VersionTimestamp)?;
-        self.receiver.encode(w).map_err(|_| EncodeError::VersionReceiver)?;
-        self.sender.encode(w).map_err(|_| EncodeError::VersionSender)?;
-        w.write_u64::<LittleEndian>(self.nonce).map_err(|_| EncodeError::VersionNonce)?;
+        w.write_i32::<LittleEndian>(self.version).map_err(|_| Error::VersionVersion)?;
+        self.services.encode(w).map_err(|_| Error::VersionServices)?;
+        //w.write_u64::<LittleEndian>(self.services.clone() as u64).map_err(|_| Error::VersionServices)?;
+        w.write_i64::<LittleEndian>(self.timestamp).map_err(|_| Error::VersionTimestamp)?;
+        self.receiver.encode(w).map_err(|_| Error::VersionReceiver)?;
+        self.sender.encode(w).map_err(|_| Error::VersionSender)?;
+        w.write_u64::<LittleEndian>(self.nonce).map_err(|_| Error::VersionNonce)?;
 
         let b_user_agent = self.user_agent.as_bytes();
-        w.write_u8(b_user_agent.len() as u8).map_err(|_| EncodeError::VersionUserAgentLen)?;
-        w.write_all(b_user_agent).map_err(|_| EncodeError::VersionUserAgent)?;
-        w.write_i32::<LittleEndian>(self.start_height).map_err(|_| EncodeError::VersionStartHeight)?;
-        w.write_u8(if self.relay { 1 } else { 0 }).map_err(|_| EncodeError::VersionRelay)?;
+        w.write_u8(b_user_agent.len() as u8).map_err(|_| Error::VersionUserAgentLen)?;
+        w.write_all(b_user_agent).map_err(|_| Error::VersionUserAgent)?;
+        w.write_i32::<LittleEndian>(self.start_height).map_err(|_| Error::VersionStartHeight)?;
+        w.write_u8(if self.relay { 1 } else { 0 }).map_err(|_| Error::VersionRelay)?;
 
         Ok(())
     }
@@ -146,14 +146,12 @@ mod test {
             services: service.clone(),
             timestamp: 0,
             receiver: NetworkAddr {
-                time: None,
                 services: service.clone(),
                 ip: ip_receiver,
                 port: 0
             },
             //[ 1, 0, 0, 0, 0, 0, 0, 0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ],
             sender: NetworkAddr {
-                time: None,
                 services: service,
                 ip: ip_receiver,
                 port: 0

@@ -1,5 +1,5 @@
 use crate::network::message::Command;
-use crate::network::error::{EncodeError, DecodeError};
+use crate::network::error::Error;
 use crate::network::message::{NetworkMessage, Encodable};
 use crate::utils::sha256::Sha256;
 use crate::block::varint;
@@ -58,30 +58,30 @@ impl NetworkMessage for GetHeadersMessage {
 
 impl Encodable for GetHeadersMessage {
 
-    fn encode(&self, w: &mut Vec<u8>) -> Result<(), EncodeError> {
+    fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
-        w.write_u32::<LittleEndian>(self.version).map_err(|_| EncodeError::GetHeadersVersion)?;
+        w.write_u32::<LittleEndian>(self.version).map_err(|_| Error::GetHeadersVersion)?;
 
-        varint::encode(w, self.locators.len() as u64).map_err(|_| EncodeError::GetHeadersLocatorsCount)?;
+        varint::encode(w, self.locators.len() as u64).map_err(|_| Error::GetHeadersLocatorsCount)?;
         for locator in &self.locators {
             let hash = locator.hash;
-            w.write_all(&hash).map_err(|_| EncodeError::GetHeadersLocators)?;
+            w.write_all(&hash).map_err(|_| Error::GetHeadersLocators)?;
         }
 
         let stop = self.stop.hash;
-        w.write_all(&stop).map_err(|_| EncodeError::GetHeadersStop)?;
+        w.write_all(&stop).map_err(|_| Error::GetHeadersStop)?;
 
         Ok(())
     }
 }
 
-pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<GetHeadersMessage, DecodeError> {
+pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<GetHeadersMessage, Error> {
 
-    let version = r.read_u32::<LittleEndian>().map_err(|_| DecodeError::GetHeadersVersion)?;
-    let locators : Vec<Sha256> = decode_locators(r).map_err(|_| DecodeError::GetHeadersLocators)?;
+    let version = r.read_u32::<LittleEndian>().map_err(|_| Error::GetHeadersVersion)?;
+    let locators : Vec<Sha256> = decode_locators(r).map_err(|_| Error::GetHeadersLocators)?;
 
     let mut hash = [0; 32];
-    r.read_exact(&mut hash).map_err(|_| DecodeError::GetHeadersStop)?;
+    r.read_exact(&mut hash).map_err(|_| Error::GetHeadersStop)?;
     let stop = Sha256 {
         hash: hash
     };
@@ -95,14 +95,14 @@ pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<GetHeadersMessage, DecodeError
     Ok(result)
 }
 
-fn decode_locators(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Sha256>, DecodeError> {
+fn decode_locators(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Sha256>, Error> {
 
     let mut result : Vec<Sha256> = Vec::new();
-    let count = varint::decode(r).map_err(|_| DecodeError::GetHeadersLocatorsCount)?;
+    let count = varint::decode(r).map_err(|_| Error::GetHeadersLocatorsCount)?;
 
     for _ in 0..count {
         let mut hash = [0; 32];
-        r.read_exact(&mut hash).map_err(|_| DecodeError::GetHeadersLocator)?;
+        r.read_exact(&mut hash).map_err(|_| Error::GetHeadersLocator)?;
         let locator = Sha256 {
             hash: hash
         };
@@ -118,7 +118,7 @@ mod test {
     use crate::network::message::Encodable;
     use crate::network::getheaders;
     use crate::network::getheaders::GetHeadersMessage;
-    use crate::network::getheaders::DecodeError;
+    use crate::network::getheaders::Error;
     use crate::utils::hexdump;
     use crate::utils::sha256::Sha256;
 
@@ -138,7 +138,7 @@ mod test {
         assert_eq!(c.position(), 0);
 
         if let Err(e) = result {
-            assert_eq!(e, DecodeError::GetHeadersVersion);
+            assert_eq!(e, Error::GetHeadersVersion);
         } else {
             panic!("should have failed");
         }
@@ -158,7 +158,7 @@ mod test {
         assert_eq!(c.position(), 0);
 
         if let Err(e) = result {
-            assert_eq!(e, DecodeError::GetHeadersVersion);
+            assert_eq!(e, Error::GetHeadersVersion);
         } else {
             panic!("should have failed");
         }
@@ -178,7 +178,7 @@ mod test {
         assert_eq!(c.position(), 4);
 
         if let Err(e) = result {
-            assert_eq!(e, DecodeError::GetHeadersLocators);
+            assert_eq!(e, Error::GetHeadersLocators);
         } else {
             panic!("should have failed");
         }

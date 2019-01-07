@@ -1,4 +1,4 @@
-use crate::block::error::DecodeError;
+use crate::block::error::Error;
 use crate::block::varint;
 
 use crate::primitives::script::Script;
@@ -6,12 +6,12 @@ use crate::primitives::script::Script;
 use std::io::Read;
 use std::io::Cursor;
 
-pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Script, DecodeError> {
+pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Script, Error> {
 
-    let scriptlen = varint::decode(r).map_err(|_| DecodeError::ScriptLen)?;
+    let scriptlen = varint::decode(r).map_err(|_| Error::ScriptLen)?;
     let mut content = vec![0u8; scriptlen as usize];
     let mut content_ref = content.as_mut_slice();
-    r.read_exact(&mut content_ref).map_err(|_| DecodeError::ScriptContent)?;
+    r.read_exact(&mut content_ref).map_err(|_| Error::ScriptContent)?;
 
     let result = Script {
         content: content
@@ -25,7 +25,7 @@ pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Script, DecodeError> {
 mod test {
 
     use crate::block::script;
-    use crate::block::error::DecodeError;
+    use crate::block::error::Error;
 
     use crate::primitives::script::Script;
 
@@ -95,7 +95,7 @@ mod test {
 
 
         if let Err(e) = parsescript {
-            assert_eq!(e, DecodeError::ScriptContent);
+            assert_eq!(e, Error::ScriptContent);
         } else {
             panic!("should have failed");
         }
@@ -111,7 +111,7 @@ mod test {
         assert!(parsescript.is_err());
 
         if let Err(e) = parsescript {
-            assert_eq!(e, DecodeError::ScriptLen);
+            assert_eq!(e, Error::ScriptLen);
         } else {
             panic!("should have failed");
         }

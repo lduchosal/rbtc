@@ -1,5 +1,5 @@
 use crate::network::message::Command;
-use crate::network::error::{EncodeError};
+use crate::network::error::{Error};
 use crate::network::message::{NetworkMessage, Encodable};
 
 
@@ -30,7 +30,7 @@ impl NetworkMessage for GetAddr {
 
 impl Encodable for GetAddr {
 
-    fn encode(&self, _: &mut Vec<u8>) -> Result<(), EncodeError> {
+    fn encode(&self, _: &mut Vec<u8>) -> Result<(), Error> {
         Ok(())
     }
 }
