@@ -1,11 +1,11 @@
-extern crate chrono;
-
 use rbtc::network::networkaddr::NetworkAddr;
 use rbtc::network::version::Version;
 use rbtc::network::version::Service;
 use rbtc::network::message::{Encodable, Message, Magic};
 
 use rbtc::utils::hexdump;
+
+use rand::Rng;
 
 use std::net::{TcpStream, IpAddr, SocketAddr};
 use std::io::prelude::*;
@@ -55,7 +55,8 @@ impl NodeWalker {
         };
         let mut request : Vec<u8> = Vec::new();
         message.encode(&mut request).map_err(|_| NodeWalkerError::Encode)?;
-        let _content = request.as_slice();
+        let hexcontent = hexdump::encode(request.clone());
+        println!("{}", hexcontent);
 
         let mut stream = self.connect(&addr)?;
         stream.write(&request).map_err(|_| NodeWalkerError::Write)?;
@@ -97,7 +98,9 @@ impl NodeWalker {
     fn payload(&self) -> Version {
 
         let now = chrono::Local::now();
-
+        let mut rng = rand::thread_rng();
+        let nonce: u64 = rng.gen();
+        
         Version {
             version: 70002,
             services: Service::Network,
@@ -114,10 +117,10 @@ impl NodeWalker {
                 ip: IpAddr::V4("0.0.0.0".parse().unwrap()),
                 port: 0
             },
-            nonce: 0xE83EE8FCCF20D947,
-            user_agent: "/Satoshi:0.17.0.1/".to_string(),
-            start_height: 0x00049F2C,
-            relay: true,
+            nonce: nonce,
+            user_agent: "/rbtc:0.17.0.1/".to_string(),
+            start_height: 557409,
+            relay: false,
         }
     }
 
