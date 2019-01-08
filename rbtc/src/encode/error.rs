@@ -30,7 +30,6 @@ pub enum Error {
 
     MessageMagic,
     MessageMagicReverse,
-    MessageCommand,
     MessagePayLoadLen,
     MessagePayLoad,
     MessageChecksum,
