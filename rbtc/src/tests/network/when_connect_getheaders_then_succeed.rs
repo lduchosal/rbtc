@@ -5,10 +5,10 @@ use tokio::net::TcpStream;
 use tokio::prelude::*;
 
 use crate::utils::sha256::Sha256;
-use crate::network::message::NetworkMessage;
+use crate::network::message::Payload;
 use crate::encode::encode::{Encodable, Decodable};
-use crate::network::getheaders::GetHeadersMessage;
-use crate::network::message::{Message, Magic, Command};
+use crate::network::getheaders::GetHeaders;
+use crate::network::message::{Message, Magic};
 
 #[test]
 fn test() {
@@ -36,7 +36,7 @@ fn test() {
 
     let stop = Sha256 { hash: [0u8; 32] };
 
-    let getheadermessage = GetHeadersMessage {
+    let getheadermessage = GetHeaders {
         version: 70001,
         locators: locators,
         stop: stop

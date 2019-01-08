@@ -1,6 +1,6 @@
 
 use crate::utils::sha256::Sha256;
-use crate::network::getheaders::GetHeadersMessage;
+use crate::network::getheaders::GetHeaders;
 use crate::network::getheaders;
 use crate::utils::hexdump;
 
@@ -31,7 +31,7 @@ fn test() {
     assert_eq!(c.position() as usize, data.len());
     assert!(result.is_ok());
 
-    let message : GetHeadersMessage = result.unwrap();
+    let message : GetHeaders = result.unwrap();
 
     assert_eq!(message.version, 70001);
     assert_eq!(message.locators.len(), 0x02);

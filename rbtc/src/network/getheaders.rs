@@ -1,6 +1,4 @@
-use crate::network::message::Command;
 use crate::encode::error::Error;
-use crate::network::message::{NetworkMessage};
 use crate::encode::encode::{Encodable, Decodable};
 use crate::utils::sha256::Sha256;
 use crate::block::varint::VarInt;
@@ -39,7 +37,7 @@ use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 /// For the block locator object in this packet, the same rules apply as for the getblocks packet.
 /// 
 #[derive(Debug)]
-pub struct GetHeadersMessage {
+pub struct GetHeaders {
     /// The protocol version
     pub version: u32,
     /// Locator hashes --- ordered newest to oldest. The remote peer will
@@ -50,14 +48,7 @@ pub struct GetHeadersMessage {
     pub stop: Sha256
 }
 
-impl NetworkMessage for GetHeadersMessage {
-
-    fn command(&self) -> Command {
-        Command::GetHeaders
-    }
-}
-
-impl Encodable for GetHeadersMessage {
+impl Encodable for GetHeaders {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
@@ -75,25 +66,27 @@ impl Encodable for GetHeadersMessage {
         Ok(())
     }
 }
+impl Decodable for GetHeaders {
 
-pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<GetHeadersMessage, Error> {
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<GetHeaders, Error> {
 
-    let version = r.read_u32::<LittleEndian>().map_err(|_| Error::GetHeadersVersion)?;
-    let locators : Vec<Sha256> = decode_locators(r).map_err(|_| Error::GetHeadersLocators)?;
+        let version = r.read_u32::<LittleEndian>().map_err(|_| Error::GetHeadersVersion)?;
+        let locators : Vec<Sha256> = decode_locators(r).map_err(|_| Error::GetHeadersLocators)?;
 
-    let mut hash = [0; 32];
-    r.read_exact(&mut hash).map_err(|_| Error::GetHeadersStop)?;
-    let stop = Sha256 {
-        hash: hash
-    };
+        let mut hash = [0; 32];
+        r.read_exact(&mut hash).map_err(|_| Error::GetHeadersStop)?;
+        let stop = Sha256 {
+            hash: hash
+        };
 
-    let result = GetHeadersMessage {
-        version: version,
-        locators: locators,
-        stop: stop
-    };
+        let result = GetHeaders {
+            version: version,
+            locators: locators,
+            stop: stop
+        };
 
-    Ok(result)
+        Ok(result)
+    }
 }
 
 fn decode_locators(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Sha256>, Error> {
@@ -116,10 +109,10 @@ fn decode_locators(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Sha256>, Error> {
 #[cfg(test)]
 mod test {
 
-    use crate::network::message::NetworkMessage;
+    use crate::network::message::Payload;
     use crate::encode::encode::{Encodable, Decodable};
     use crate::network::getheaders;
-    use crate::network::getheaders::GetHeadersMessage;
+    use crate::network::getheaders::GetHeaders;
     use crate::network::getheaders::Error;
     use crate::utils::hexdump;
     use crate::utils::sha256::Sha256;
@@ -208,7 +201,7 @@ mod test {
         assert!(result.is_ok());
         assert_eq!(c.position() as usize, data.len());
 
-        let message : GetHeadersMessage = result.unwrap();
+        let message : GetHeaders = result.unwrap();
         assert_eq!(message.version, 70001);
         assert_eq!(message.locators.len(), 0x02);
 
@@ -303,7 +296,7 @@ mod test {
             ]
         };
 
-        let message = GetHeadersMessage {
+        let message = GetHeaders {
             version: 70001,
             locators: locators,
             stop: stop

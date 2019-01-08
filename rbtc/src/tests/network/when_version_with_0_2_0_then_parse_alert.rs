@@ -1,5 +1,6 @@
 use crate::utils::hexdump;
-
+use crate::encode::encode::{Encodable, Decodable};
+use crate::network::message::Message;
 #[test]
 fn test() {
 
@@ -30,4 +31,8 @@ fn test() {
 
     let data : Vec<u8> = hexdump::decode(dump);
     assert_eq!(data.len(), 0x158);
+
+    let message = Message::decode(data);
+    assert!(message.is_ok());
+
 }

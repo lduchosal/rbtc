@@ -27,12 +27,22 @@ pub enum Error {
 
     ReadSha256,
     WriteSha256,
+    
+    Command,
+    CommandFromStr,
+    CommandDecode,
 
+    Magic,
+    
     MessageMagic,
     MessageMagicReverse,
     MessagePayLoadLen,
     MessagePayLoad,
     MessageChecksum,
+    MessageChecksumInvalid,
+
+    Payload,
+    PayloadUnknown,
 
     GetHeadersVersion,
     GetHeadersLocatorsCount,

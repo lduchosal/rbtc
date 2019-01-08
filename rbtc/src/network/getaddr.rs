@@ -1,6 +1,4 @@
-use crate::network::message::Command;
 use crate::encode::error::Error;
-use crate::network::message::{NetworkMessage};
 use crate::encode::encode::{Encodable, Decodable};
 
 use std::io::{Read, Write, Cursor};
@@ -24,20 +22,12 @@ use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 pub struct GetAddr {
 }
 
-impl NetworkMessage for GetAddr {
-
-    fn command(&self) -> Command {
-        Command::GetAddr
-    }
-}
-
 impl Encodable for GetAddr {
 
     fn encode(&self, _: &mut Vec<u8>) -> Result<(), Error> {
         Ok(())
     }
 }
-
 
 impl Decodable for GetAddr {
 
@@ -46,11 +36,10 @@ impl Decodable for GetAddr {
     }
 }
 
-
 #[cfg(test)]
 mod test {
 
-    use crate::network::message::NetworkMessage;
+    use crate::network::message::Payload;
     use crate::encode::encode::{Encodable, Decodable};
     use crate::network::getaddr::GetAddr;
 

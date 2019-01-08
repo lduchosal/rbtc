@@ -1,8 +1,7 @@
-use crate::network::message::{NetworkMessage};
+use crate::network::message::{Payload};
 use crate::encode::encode::{Encodable, Decodable};
 use crate::network::networkaddr::NetworkAddr;
 use crate::encode::error::Error;
-use crate::network::message::Command;
 
 use std::io::{Write, Read, Cursor};
 use byteorder::{LittleEndian, WriteBytesExt, ReadBytesExt};
@@ -103,13 +102,6 @@ impl Decodable for Service {
     }
 }
 
-impl NetworkMessage for Version {
-
-    fn command(&self) -> Command {
-        Command::Version
-    }
-}
-
 impl Encodable for Version {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
@@ -176,7 +168,7 @@ mod test {
     use crate::network::version::Version;
     use crate::network::version::Service;
     use crate::network::networkaddr::NetworkAddr;
-    use crate::network::message::NetworkMessage;
+    use crate::network::message::Payload;
     use crate::encode::encode::{Encodable, Decodable};
     use crate::utils::hexdump;
 
