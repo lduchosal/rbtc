@@ -61,6 +61,15 @@ pub struct Transaction {
 #[derive(Debug)]
 pub struct Transactions(Vec<Transaction>);
 
+impl Transactions {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+    pub fn get(&self, index: usize) -> Option<&Transaction> {
+        self.0.get(index)
+    }
+}
+
 impl Decodable for Transaction {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, Error> {
@@ -96,16 +105,6 @@ impl Decodable for Transaction {
         };
         
         Ok(result)
-    }
-}
-
-impl Transactions {
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    pub fn get(&self, index: usize) -> Option<&Transaction> {
-        self.0.get(index)
     }
 }
 

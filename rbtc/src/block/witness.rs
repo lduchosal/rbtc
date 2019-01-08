@@ -13,6 +13,15 @@ pub struct Witness {
 #[derive(Debug)]
 pub struct Witnesses (Vec<Witness>);
 
+impl Witnesses {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+    pub fn get(&self, index: usize) -> Option<&Witness> {
+        self.0.get(index)
+    }
+}
+
 impl Decodable for Witnesses {
         
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Witnesses, Error> {
@@ -49,6 +58,7 @@ impl Decodable for Witness {
 mod test {
 
     use crate::encode::error::Error;
+    use crate::encode::encode::{Encodable, Decodable};
     use crate::block::witness;
     use crate::block::witness::Witness;
 

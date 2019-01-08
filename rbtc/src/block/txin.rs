@@ -34,6 +34,15 @@ pub struct TxIn {
 #[derive(Debug)]
 pub struct TxIns (Vec<TxIn>);
 
+impl TxIns {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+    pub fn get(&self, index: usize) -> Option<&TxIn> {
+        self.0.get(index)
+    }
+}
+
 
 impl Decodable for TxIns {
     

@@ -368,7 +368,7 @@ fn test() {
     );
 
     assert!(t1.witness.is_some(), "t1.witness");
-    let t1ws : &Vec<Witness> = t1.witness.as_ref().unwrap();
+    let t1ws = t1.witness.as_ref().unwrap();
     let t1w : &Witness = t1ws.get(0).unwrap();
 
     assert_eq!(t1w.data.len(), 0x20, "t1w.data.len");

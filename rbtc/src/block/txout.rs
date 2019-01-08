@@ -20,6 +20,15 @@ pub struct TxOut {
 #[derive(Debug)]
 pub struct TxOuts (Vec<TxOut>);
 
+impl TxOuts {
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+    pub fn get(&self, index: usize) -> Option<&TxOut> {
+        self.0.get(index)
+    }
+}
+
 impl Decodable for TxOuts {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxOuts, Error> {
