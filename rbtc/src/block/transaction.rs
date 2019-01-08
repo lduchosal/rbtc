@@ -1,13 +1,11 @@
 use crate::encode::error::Error;
 use crate::encode::encode::{Encodable, Decodable};
 use crate::block::varint::VarInt;
-use crate::block::txin;
-use crate::block::txout;
 use crate::block::witness;
 
-use crate::block::txout::TxOut;
-use crate::block::txin::TxIn;
-use crate::block::witness::Witness;
+use crate::block::txout::TxOuts;
+use crate::block::txin::TxIns;
+use crate::block::witness::Witnesses;
 
 use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
@@ -54,9 +52,9 @@ use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 pub struct Transaction {
     pub version: i32,
     pub flag: Option<u16>,
-    pub inputs: Vec<TxIn>,
-    pub outputs: Vec<TxOut>,
-    pub witness: Option<Vec<Witness>>,
+    pub inputs: TxIns,
+    pub outputs: TxOuts,
+    pub witness: Option<Witnesses>,
     pub locktime: u32
 }
 
@@ -78,11 +76,11 @@ impl Decodable for Transaction {
             r.set_position(position);
         };
 
-        let inputs = txin::decode_all(r)?;
-        let outputs = txout::decode_all(r)?;
+        let inputs = TxIns::decode(r)?;
+        let outputs = TxOuts::decode(r)?;
 
         let witnesses = match flag {
-            Some(_) => Some(witness::decode_all(r)?),
+            Some(_) => Some(Witnesses::decode(r)?),
             _ => None
         };
 
@@ -106,7 +104,7 @@ impl Transactions {
         self.0.len()
     }
 
-    pub fn get<I>(&self, index: I) -> Option<&Transaction> {
+    pub fn get(&self, index: usize) -> Option<&Transaction> {
         self.0.get(index)
     }
 }

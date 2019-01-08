@@ -17,35 +17,46 @@ pub struct TxOut {
     pub script_pubkey: Script // scriptPubKey
 } 
 
-pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxOut>, Error> {
+#[derive(Debug)]
+pub struct TxOuts (Vec<TxOut>);
 
-    let mut result : Vec<TxOut> = Vec::new();
-    let count = VarInt::decode(r).map_err(|_| Error::OutputsCount)?;
+impl Decodable for TxOuts {
 
-    for _ in 0..count.0 {
-        let output = decode(r)?;
-        result.push(output);
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxOuts, Error> {
+
+        let mut txouts : Vec<TxOut> = Vec::new();
+        let count = VarInt::decode(r).map_err(|_| Error::OutputsCount)?;
+
+        for _ in 0..count.0 {
+            let output = TxOut::decode(r)?;
+            txouts.push(output);
+        }
+
+        let result = TxOuts(txouts);
+
+        Ok(result)
     }
-
-    Ok(result)
 }
 
-pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxOut, Error> {
+impl Decodable for TxOut {
 
-    let amount = u64::decode(r).map_err(|_| Error::TxOutAmount)?;
-    let script_pubkey = Script::decode(r)
-        .map_err(|e| {
-            match e {
-                Error::ScriptContent => Error::ScriptPubKeyScriptContent,
-                Error::ScriptLen => Error::ScriptPubKeyScriptLen,
-                _ => e
-            }
-        })?;
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxOut, Error> {
 
-    let result = TxOut {
-        amount: amount,
-        script_pubkey: script_pubkey // scriptPubKey
-    };
-    
-    Ok(result)
+        let amount = u64::decode(r).map_err(|_| Error::TxOutAmount)?;
+        let script_pubkey = Script::decode(r)
+            .map_err(|e| {
+                match e {
+                    Error::ScriptContent => Error::ScriptPubKeyScriptContent,
+                    Error::ScriptLen => Error::ScriptPubKeyScriptLen,
+                    _ => e
+                }
+            })?;
+
+        let result = TxOut {
+            amount: amount,
+            script_pubkey: script_pubkey // scriptPubKey
+        };
+        
+        Ok(result)
+    }
 }

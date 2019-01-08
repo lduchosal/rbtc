@@ -31,37 +31,48 @@ pub struct TxIn {
     pub sequence: u32,
 } 
 
-pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxIn>, Error> {
+#[derive(Debug)]
+pub struct TxIns (Vec<TxIn>);
 
-    let mut result : Vec<TxIn> = Vec::new();
-    let count = VarInt::decode(r).map_err(|_| Error::InputsCount)?;
-    for _ in 0..count.0 {
-        let input = decode(r)?;
-        result.push(input);
+
+impl Decodable for TxIns {
+    
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxIns, Error> {
+
+        let mut txins : Vec<TxIn> = Vec::new();
+        let count = VarInt::decode(r).map_err(|_| Error::InputsCount)?;
+        for _ in 0..count.0 {
+            let input = TxIn::decode(r)?;
+            txins.push(input);
+        }
+        let result = TxIns(txins);
+        Ok(result)
     }
-
-    Ok(result)
 }
 
-pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxIn, Error> {
 
-    let previous = OutPoint::decode(r).map_err(|_| Error::TxInOutPoint)?;
-
-    let signature = Script::decode(r)
-        .map_err(|e| {
-            match e {
-                Error::ScriptContent => Error::SignatureScriptContent,
-                Error::ScriptLen => Error::SignatureScriptLen,
-                _ => e
-            }
-        })?;
-    let sequence = u32::decode(r).map_err(|_| Error::TxInSequence)?;
-
-    let result = TxIn {
-        previous: previous,
-        signature: signature,
-        sequence: sequence,
-    };
+impl Decodable for TxIn {
     
-    Ok(result)
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxIn, Error> {
+
+        let previous = OutPoint::decode(r).map_err(|_| Error::TxInOutPoint)?;
+
+        let signature = Script::decode(r)
+            .map_err(|e| {
+                match e {
+                    Error::ScriptContent => Error::SignatureScriptContent,
+                    Error::ScriptLen => Error::SignatureScriptLen,
+                    _ => e
+                }
+            })?;
+        let sequence = u32::decode(r).map_err(|_| Error::TxInSequence)?;
+
+        let result = TxIn {
+            previous: previous,
+            signature: signature,
+            sequence: sequence,
+        };
+        
+        Ok(result)
+    }
 }

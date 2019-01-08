@@ -10,27 +10,39 @@ pub struct Witness {
     pub data: Vec<u8>
 }
 
-pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Witness>, Error> {
-    let mut result: Vec<Witness> = Vec::new();
-    let count = VarInt::decode(r).map_err(|_| Error::WitnessesCount)?;
-    for _ in 0..count.0 {
-        let witness = decode(r)?;
-        result.push(witness);
-    }
+#[derive(Debug)]
+pub struct Witnesses (Vec<Witness>);
 
-    Ok(result)
+impl Decodable for Witnesses {
+        
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Witnesses, Error> {
+
+        let mut witnesses: Vec<Witness> = Vec::new();
+        let count = VarInt::decode(r).map_err(|_| Error::WitnessesCount)?;
+        for _ in 0..count.0 {
+            let witness = Witness::decode(r)?;
+            witnesses.push(witness);
+        }
+        let result = Witnesses(witnesses);
+
+        Ok(result)
+    }
 }
 
-pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Witness, Error> {
-    let varlen = VarInt::decode(r).map_err(|_| Error::WitnessLen)?;
-    let mut data = vec![0u8; varlen.0 as usize];
-    let mut data_ref = data.as_mut_slice();
-    r.read_exact(&mut data_ref)
-        .map_err(|_| Error::WitnessData)?;
+impl Decodable for Witness {
 
-    let result = Witness { data: data };
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Witness, Error> {
 
-    Ok(result)
+        let varlen = VarInt::decode(r).map_err(|_| Error::WitnessLen)?;
+        let mut data = vec![0u8; varlen.0 as usize];
+        let mut data_ref = data.as_mut_slice();
+        r.read_exact(&mut data_ref)
+            .map_err(|_| Error::WitnessData)?;
+
+        let result = Witness { data: data };
+
+        Ok(result)
+    }
 }
 
 #[cfg(test)]
@@ -46,11 +58,11 @@ mod test {
     fn decode_0x00_then_1_byte() {
         let data: Vec<u8> = vec![0x00];
         let mut c = Cursor::new(data.as_ref());
-        let parsewitness = witness::decode(&mut c);
-        assert!(parsewitness.is_ok());
+        let result = Witness::decode(&mut c);
+        assert!(result.is_ok());
         assert_eq!(c.position(), 1);
 
-        let result: Witness = parsewitness.unwrap();
+        let result: Witness = result.unwrap();
         assert_eq!(result.data.len(), 0x00);
     }
 
@@ -58,11 +70,11 @@ mod test {
     fn decode_0x01_then_1_byte() {
         let data: Vec<u8> = vec![0x01, 0x00];
         let mut c = Cursor::new(data.as_ref());
-        let parsewitness = witness::decode(&mut c);
-        assert!(parsewitness.is_ok());
+        let result = Witness::decode(&mut c);
+        assert!(result.is_ok());
         assert_eq!(c.position(), 2);
 
-        let result: Witness = parsewitness.unwrap();
+        let result: Witness = result.unwrap();
         assert_eq!(result.data.len(), 0x01);
     }
 
@@ -70,11 +82,11 @@ mod test {
     fn decode_0x02_then_2_byte() {
         let data: Vec<u8> = vec![0x02, 0x00, 0x00];
         let mut c = Cursor::new(data.as_ref());
-        let parsewitness = witness::decode(&mut c);
-        assert!(parsewitness.is_ok());
+        let result = Witness::decode(&mut c);
+        assert!(result.is_ok());
         assert_eq!(c.position(), 3);
 
-        let result: Witness = parsewitness.unwrap();
+        let result: Witness = result.unwrap();
         assert_eq!(result.data.len(), 0x02);
     }
 
@@ -85,11 +97,11 @@ mod test {
             0x00, 0x00, 0x00,
         ];
         let mut c = Cursor::new(data.as_ref());
-        let parsewitness = witness::decode(&mut c);
-        assert!(parsewitness.is_ok());
+        let result = Witness::decode(&mut c);
+        assert!(result.is_ok());
         assert_eq!(c.position(), 0x11);
 
-        let result: Witness = parsewitness.unwrap();
+        let result: Witness = result.unwrap();
         assert_eq!(result.data.len(), 0x10);
     }
 
@@ -97,11 +109,11 @@ mod test {
     fn decode_invalid_size_then_fail() {
         let data: Vec<u8> = vec![0x01];
         let mut c = Cursor::new(data.as_ref());
-        let parsewitness = witness::decode(&mut c);
-        assert!(parsewitness.is_err());
+        let result = Witness::decode(&mut c);
+        assert!(result.is_err());
         assert_eq!(c.position(), 0x01);
 
-        if let Err(e) = parsewitness {
+        if let Err(e) = result {
             assert_eq!(e, Error::WitnessData);
         } else {
             panic!("should have failed");
@@ -112,10 +124,10 @@ mod test {
     fn decode_invalid_content_then_fail() {
         let data: Vec<u8> = vec![];
         let mut c = Cursor::new(data.as_ref());
-        let parsewitness = witness::decode(&mut c);
-        assert!(parsewitness.is_err());
+        let result = Witness::decode(&mut c);
+        assert!(result.is_err());
 
-        if let Err(e) = parsewitness {
+        if let Err(e) = result {
             assert_eq!(e, Error::WitnessLen);
         } else {
             panic!("should have failed");
