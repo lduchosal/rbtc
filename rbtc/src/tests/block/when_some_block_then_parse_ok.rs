@@ -2,7 +2,7 @@ use crate::block::outpoint::OutPoint;
 use crate::block::transaction::Transaction;
 use crate::block::txin::TxIn;
 use crate::block::txout::TxOut;
-use crate::block::block;
+use crate::block::block::Block;
 use crate::utils::hexdump;
 
 #[test]
@@ -55,7 +55,7 @@ fn test() {
 
     assert_eq!(hex.len(), 643);
 
-    let result = block::parse(&hex);
+    let result = Block::parse(&hex);
     assert!(result.is_ok());
 
     let b = result.ok().unwrap();

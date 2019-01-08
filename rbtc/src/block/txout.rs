@@ -33,7 +33,7 @@ pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxOut>, Error> 
 pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxOut, Error> {
 
     let amount = u64::decode(r).map_err(|_| Error::TxOutAmount)?;
-    let script_pubkey = script::decode(r)
+    let script_pubkey = Script::decode(r)
         .map_err(|e| {
             match e {
                 Error::ScriptContent => Error::ScriptPubKeyScriptContent,

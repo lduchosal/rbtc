@@ -12,7 +12,6 @@ use crate::block::witness::Witness;
 use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 
-
 /// 
 /// https://en.bitcoin.it/wiki/Transaction
 /// 
@@ -61,50 +60,69 @@ pub struct Transaction {
     pub locktime: u32
 }
 
-pub fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, Error> {
+#[derive(Debug)]
+pub struct Transactions(Vec<Transaction>);
 
-    let version = i32::decode(r).map_err(|_| Error::TransactionVersion)?;
+impl Decodable for Transaction {
 
-    let position = r.position();
-    let flag = u16::decode(r)
-        .map(|v| match v { 0x0100 => Some(v), _ => None })
-        .map_err(|_| Error::TransactionFlag)?;
-    
-    if flag.is_none() {
-        r.set_position(position);
-    };
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, Error> {
 
-    let inputs = txin::decode_all(r)?;
-    let outputs = txout::decode_all(r)?;
+        let version = i32::decode(r).map_err(|_| Error::TransactionVersion)?;
 
-    let witnesses = match flag {
-        Some(_) => Some(witness::decode_all(r)?),
-        _ => None
-    };
+        let position = r.position();
+        let flag = u16::decode(r)
+            .map(|v| match v { 0x0100 => Some(v), _ => None })
+            .map_err(|_| Error::TransactionFlag)?;
+        
+        if flag.is_none() {
+            r.set_position(position);
+        };
 
-    let locktime = u32::decode(r).map_err(|_| Error::TransactionLockTime)?;
+        let inputs = txin::decode_all(r)?;
+        let outputs = txout::decode_all(r)?;
 
-    let result = Transaction {
-        version: version,
-        flag: flag,
-        inputs: inputs,
-        outputs: outputs,
-        witness: witnesses,
-        locktime: locktime
-    };
-    
-    Ok(result)
+        let witnesses = match flag {
+            Some(_) => Some(witness::decode_all(r)?),
+            _ => None
+        };
+
+        let locktime = u32::decode(r).map_err(|_| Error::TransactionLockTime)?;
+
+        let result = Transaction {
+            version: version,
+            flag: flag,
+            inputs: inputs,
+            outputs: outputs,
+            witness: witnesses,
+            locktime: locktime
+        };
+        
+        Ok(result)
+    }
 }
 
-pub(crate) fn decode_all(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Transaction>, Error> {
-
-    let mut result : Vec<Transaction> = Vec::new();
-    let count = VarInt::decode(r).map_err(|_| Error::TransactionsCount)?;
-
-    for _ in 0..count.0 {
-        let transaction = decode(r)?;
-        result.push(transaction);
+impl Transactions {
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
+
+    pub fn get<I>(&self, index: I) -> Option<&Transaction> {
+        self.0.get(index)
+    }
+}
+
+impl Decodable for Transactions {
     
-    Ok(result)
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Transactions, Error> {
+
+        let mut txs : Vec<Transaction> = Vec::new();
+        let count = VarInt::decode(r).map_err(|_| Error::TransactionsCount)?;
+
+        for _ in 0..count.0 {
+            let tx = Transaction::decode(r)?;
+            txs.push(tx);
+        }
+        let result = Transactions(txs);
+        Ok(result)
+    }
 }

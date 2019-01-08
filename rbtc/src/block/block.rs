@@ -1,10 +1,48 @@
-use crate::block::transaction;
 use crate::encode::error::Error;
-use crate::block::transaction::Transaction;
+use crate::encode::encode::{Encodable, Decodable};
+use crate::block::transaction::Transactions;
 
 use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, ReadBytesExt};
 
+/// https://en.bitcoin.it/wiki/Block
+/// 
+/// # Block
+/// 
+/// Transaction data is permanently recorded in files called **blocks**. They can be thought of as the individual pages of a city recorder's recordbook (where changes to title to real estate are recorded) or a stock transaction ledger. Blocks are organized into a linear sequence over time (also known as the block chain). New transactions are constantly being processed by miners into new blocks which are added to the end of the chain. As blocks are buried deeper and deeper into the blockchain they become harder and harder to change or remove, this gives rise of bitcoin's Irreversible Transactions.
+/// 
+/// ## Block structure
+/// ```
+/// +--------------+------------------------------------------+-------+
+/// | Field        | Description                              | Bytes |
+/// +--------------+------------------------------------------+-------+
+/// | Magic no     | value always 0xD9B4BEF9                  | 4     |
+/// +--------------+------------------------------------------+-------+
+/// | Blocksize    | number of bytes following up to end      | 4     |
+/// |              |  of block                                |       |
+/// +--------------+------------------------------------------+-------+
+/// | Blockheader  | consists of 6 items                      | 80    |
+/// +--------------+------------------------------------------+-------+
+/// | tx counter   | positive integer VI = VarInt             | 1 - 9 |
+/// +--------------+------------------------------------------+-------+
+/// | transactions | the (non empty) list of transactions     | var   |
+/// +--------------+------------------------------------------+-------+
+/// ```
+/// 
+/// ## Description
+/// 
+/// Each block contains, among other things, a record of some or all recent transactions, and a reference to the block that came immediately before it. It also contains an answer to a difficult-to-solve mathematical puzzle - the answer to which is unique to each block. New blocks cannot be submitted to the network without the correct answer - the process of "mining" is essentially the process of competing to be the next to find the answer that "solves" the current block. The mathematical problem in each block is extremely difficult to solve, but once a valid solution is found, it is very easy for the rest of the network to confirm that the solution is correct. There are multiple valid solutions for any given block - only one of the solutions needs to be found for the block to be solved.
+/// 
+/// Because there is a reward of brand new bitcoins for solving each block, every block also contains a record of which Bitcoin addresses or scripts are entitled to receive the reward. This record is known as a generation transaction, or a coinbase transaction, and is always the first transaction appearing in every block. The number of Bitcoins generated per block starts at 50 and is halved every 210,000 blocks (about four years).
+/// 
+/// Bitcoin transactions are broadcast to the network by the sender, and all peers trying to solve blocks collect the transaction records and add them to the block they are working to solve. Miners get incentive to include transactions in their blocks because of attached transaction fees.
+/// 
+/// The difficulty of the mathematical problem is automatically adjusted by the network, such that it targets a goal of solving an average of 6 blocks per hour. Every 2016 blocks (solved in about two weeks), all Bitcoin clients compare the actual number created with this goal and modify the target by the percentage that it varied. The network comes to a consensus and automatically increases (or decreases) the difficulty of generating blocks.
+/// 
+/// Because each block contains a reference to the prior block, the collection of all blocks in existence can be said to form a chain. However, it's possible for the chain to have temporary splits - for example, if two miners arrive at two different valid solutions for the same block at the same time, unbeknownst to one another. The peer-to-peer network is designed to resolve these splits within a short period of time, so that only one branch of the chain survives.
+/// 
+/// The client accepts the 'longest' chain of blocks as valid. The 'length' of the entire block chain refers to the chain with the most combined difficulty, not the one with the most blocks. This prevents someone from forking the chain and creating a large number of low-difficulty blocks, and having it accepted by the network as 'longest'.
+/// 
 #[derive(Debug)]
 pub struct Block {
     // header
@@ -14,78 +52,65 @@ pub struct Block {
     pub time: u32,
     pub bits: u32,
     pub nonce: u32,
-    pub transactions: Vec<Transaction>
+    pub transactions: Transactions
+}
+impl Block {
+
+    pub fn parse(hex: &Vec<u8>) -> Result<Block, Error> {
+
+        if hex.len() < 81 { // might not be true
+            return Err(Error::InvalidLength);
+        }
+        let mut r = Cursor::new(hex);
+        let result = Block::decode(&mut r)?;
+
+        if r.position() as usize != hex.len() {
+            return Err(Error::RemainingContent);
+        }
+        Ok(result)
+    }
 }
 
-pub fn parse(hex: &Vec<u8>) -> Result<Block, Error> {
+impl Decodable for Block {
 
-    if hex.len() < 81 { // might not be true
-        return Err(Error::InvalidLength);
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Block, Error> {
+
+        let version = u32::decode(r).map_err(|_| Error::BlockVersion)?;
+
+        let mut previous = [0; 32];
+        r.read_exact(&mut previous).map_err(|_| Error::BlockPrevious)?;
+
+        let mut merkleroot = [0; 32];
+        r.read_exact(&mut merkleroot).map_err(|_| Error::BlockMerkleRoot)?;
+
+        let time = u32::decode(r).map_err(|_| Error::BlockTime)?;
+        let bits = u32::decode(r).map_err(|_| Error::BlockBits)?;
+        let nonce = u32::decode(r).map_err(|_| Error::BlockNonce)?;
+
+        let transactions = Transactions::decode(r)?;
+
+        let result = Block {
+            version: version,
+            previous: previous,
+            merkleroot: merkleroot,
+            time: time,
+            bits: bits,
+            nonce: nonce,
+            transactions: transactions
+        };
+
+        Ok(result)
     }
-    let mut r = Cursor::new(hex);
-    let result = decode(&mut r)?;
-
-    if r.position() as usize != hex.len() {
-        return Err(Error::RemainingContent);
-    }
-    Ok(result)
-}
-
-/// https://en.bitcoin.it/wiki/Block
-/// 
-/// Block structure
-/// +----------------------+------------------------------------------------+--------------------------+
-/// | Field                | Description                                    | Size                     |
-/// +----------------------+------------------------------------------------+--------------------------+
-/// | Magic no             | value always 0xD9B4BEF9                        |  4 bytes                 |
-/// +----------------------+------------------------------------------------+--------------------------+
-/// | Blocksize            | number of bytes following up to end of block   |  4 bytes                 |
-/// +----------------------+------------------------------------------------+--------------------------+
-/// | Blockheader          | consists of 6 items                            | 80 bytes                 |
-/// +----------------------+------------------------------------------------+--------------------------+
-/// | Transaction counter  | positive integer VI = VarInt                   |  1 - 9 bytes             |
-/// +----------------------+------------------------------------------------+--------------------------+
-/// | transactions         | the (non empty) list of transactions           |  <Transaction counter>-  |
-/// |                      |                                                |  many transactions       |
-/// +----------------------+------------------------------------------------+--------------------------+
-/// 
-fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Block, Error> {
-
-    let version = r.read_u32::<LittleEndian>().map_err(|_| Error::BlockVersion)?;
-
-    let mut previous = [0; 32];
-    r.read_exact(&mut previous).map_err(|_| Error::BlockPrevious)?;
-
-    let mut merkleroot = [0; 32];
-    r.read_exact(&mut merkleroot).map_err(|_| Error::BlockMerkleRoot)?;
-
-    let time = r.read_u32::<LittleEndian>().map_err(|_| Error::BlockTime)?;
-    let bits = r.read_u32::<LittleEndian>().map_err(|_| Error::BlockBits)?;
-    let nonce = r.read_u32::<LittleEndian>().map_err(|_| Error::BlockNonce)?;
-
-    let transactions = transaction::decode_all(r)?;
-
-    let result = Block {
-        version: version,
-        previous: previous,
-        merkleroot: merkleroot,
-        time: time,
-        bits: bits,
-        nonce: nonce,
-        transactions: transactions
-    };
-
-    Ok(result)
 }
 
 #[cfg(test)]
 mod test {
 
-    use crate::block::block;
     use crate::utils::hexdump;
     use crate::encode::error::Error;
-
+    use crate::encode::encode::{Encodable, Decodable};
     use crate::block::block::Block;
+
     use std::io::Cursor;
 
     #[test]
@@ -97,7 +122,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::decode(&mut c);
+        let block = Block::decode(&mut c);
         assert!(block.is_err());
         assert_eq!(c.position(), 0);
 
@@ -117,7 +142,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::decode(&mut c);
+        let block = Block::decode(&mut c);
         assert!(block.is_err());
         assert_eq!(c.position(), 0);
 
@@ -138,7 +163,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::decode(&mut c);
+        let block = Block::decode(&mut c);
         assert!(block.is_err());
         assert_eq!(c.position(), 4);
 
@@ -160,7 +185,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::decode(&mut c);
+        let block = Block::decode(&mut c);
         assert!(block.is_err());
         assert_eq!(c.position(), 36);
 
@@ -184,7 +209,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::decode(&mut c);
+        let block = Block::decode(&mut c);
         assert!(block.is_err());
         assert_eq!(c.position(), 68);
 
@@ -208,7 +233,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::decode(&mut c);
+        let block = Block::decode(&mut c);
         assert!(block.is_err());
         assert_eq!(c.position(), 72);
 
@@ -232,7 +257,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::decode(&mut c);
+        let block = Block::decode(&mut c);
         assert!(block.is_err());
         assert_eq!(c.position(), 76);
 
@@ -256,7 +281,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::decode(&mut c);
+        let block = Block::decode(&mut c);
         assert!(block.is_err());
         assert_eq!(c.position(), 80);
 
@@ -281,7 +306,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::decode(&mut c);
+        let block = Block::decode(&mut c);
         assert!(block.is_ok());
         assert_eq!(c.position(), 81);
 
@@ -312,7 +337,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
-        let block = block::decode(&mut c);
+        let block = Block::decode(&mut c);
         assert!(block.is_ok());
         assert_eq!(c.position(), 81);
 

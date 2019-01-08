@@ -9,27 +9,28 @@ pub struct Script {
     pub content: Vec<u8>
 }
 
-pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Script, Error> {
+impl Decodable for Script {
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Script, Error> {
 
-    let scriptlen = VarInt::decode(r).map_err(|_| Error::ScriptLen)?;
-    let mut content = vec![0u8; scriptlen.0 as usize];
-    let mut content_ref = content.as_mut_slice();
-    r.read_exact(&mut content_ref).map_err(|_| Error::ScriptContent)?;
+        let scriptlen = VarInt::decode(r).map_err(|_| Error::ScriptLen)?;
+        let mut content = vec![0u8; scriptlen.0 as usize];
+        let mut content_ref = content.as_mut_slice();
+        r.read_exact(&mut content_ref).map_err(|_| Error::ScriptContent)?;
 
-    let result = Script {
-        content: content
-    };
+        let result = Script {
+            content: content
+        };
 
-    Ok(result)
+        Ok(result)
+    }
 }
 
 
 #[cfg(test)]
 mod test {
 
-    use crate::block::script;
     use crate::encode::error::Error;
-
+    use crate::encode::encode::{Encodable, Decodable};
     use crate::block::script::Script;
 
     use std::io::Cursor;
@@ -39,7 +40,7 @@ mod test {
 
         let data : Vec<u8> = vec![0x00];
         let mut c = Cursor::new(data.as_ref());
-        let parsescript = script::decode(&mut c);
+        let parsescript = Script::decode(&mut c);
         assert!(parsescript.is_ok());
         assert_eq!(c.position(), 1);
 
@@ -52,7 +53,7 @@ mod test {
 
         let data : Vec<u8> = vec![0x01, 0x00];
         let mut c = Cursor::new(data.as_ref());
-        let parsescript = script::decode(&mut c);
+        let parsescript = Script::decode(&mut c);
         assert!(parsescript.is_ok());
         assert_eq!(c.position(), 2);
 
@@ -65,7 +66,7 @@ mod test {
 
         let data : Vec<u8> = vec![0x02, 0x00, 0x00];
         let mut c = Cursor::new(data.as_ref());
-        let parsescript = script::decode(&mut c);
+        let parsescript = Script::decode(&mut c);
         assert!(parsescript.is_ok());
         assert_eq!(c.position(), 3);
 
@@ -78,7 +79,7 @@ mod test {
 
         let data : Vec<u8> = vec![0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ];
         let mut c = Cursor::new(data.as_ref());
-        let parsescript = script::decode(&mut c);
+        let parsescript = Script::decode(&mut c);
         assert!(parsescript.is_ok());
         assert_eq!(c.position(), 0x11);
 
@@ -92,7 +93,7 @@ mod test {
 
         let data : Vec<u8> = vec![0x01 ];
         let mut c = Cursor::new(data.as_ref());
-        let parsescript = script::decode(&mut c);
+        let parsescript = Script::decode(&mut c);
         assert!(parsescript.is_err());
         assert_eq!(c.position(), 0x01);
 
@@ -110,7 +111,7 @@ mod test {
 
         let data : Vec<u8> = vec![ ];
         let mut c = Cursor::new(data.as_ref());
-        let parsescript = script::decode(&mut c);
+        let parsescript = Script::decode(&mut c);
         assert!(parsescript.is_err());
 
         if let Err(e) = parsescript {

@@ -1,4 +1,4 @@
-use crate::block::block;
+use crate::block::block::Block;
 use crate::encode::error::Error;
 use crate::utils::hexdump;
 
@@ -51,7 +51,7 @@ fn test() {
 
     assert_eq!(hex.len(), 639);
 
-    let result = block::parse(&hex);
+    let result = Block::parse(&hex);
     assert!(result.is_err());
 
     let err = result.err().unwrap();

@@ -1,6 +1,6 @@
 
 use crate::encode::error::Error;
-use crate::block::block;
+use crate::block::block::Block;
 use crate::utils::hexdump;
 
 #[test]
@@ -15,7 +15,7 @@ fn test() {
 
     assert_eq!(hex.len(), 16);
 
-    let result = block::parse(&hex);
+    let result = Block::parse(&hex);
     assert!(result.is_err());
 
     let b = result.err().unwrap();

@@ -289,7 +289,7 @@ fn test() {
 
     assert_eq!(hex.len(), 4319);
 
-    let result = block::parse(&hex);
+    let result = Block::parse(&hex);
     assert!(result.is_ok());
 
     let b : Block = result.ok().unwrap();

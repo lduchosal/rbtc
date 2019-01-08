@@ -47,7 +47,7 @@ pub(crate) fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxIn, Error> {
 
     let previous = OutPoint::decode(r).map_err(|_| Error::TxInOutPoint)?;
 
-    let signature = script::decode(r)
+    let signature = Script::decode(r)
         .map_err(|e| {
             match e {
                 Error::ScriptContent => Error::SignatureScriptContent,
