@@ -22,9 +22,17 @@ pub enum Error {
     WriteU16,
     WriteU8,
 
+    ReadExact,
+
+    WriteAll,
     ReadBool,
     WriteBool,
 
+    VecContent,
+    VecLen,
+
+
+    Sha256Count,
     ReadSha256,
     WriteSha256,
     
@@ -36,10 +44,11 @@ pub enum Error {
     
     MessageMagic,
     MessageMagicReverse,
-    MessagePayLoadLen,
+    PayLoadLen,
     MessagePayLoad,
-    MessageChecksum,
-    MessageChecksumInvalid,
+    PayloadChecksum,
+    PayloadChecksumData,
+    PayloadChecksumInvalid,
 
     Payload,
     PayloadUnknown,
@@ -98,14 +107,9 @@ pub enum Error {
     TransactionVersion,
     TransactionLockTime,
 
-    ScriptContent,
-    ScriptLen,
-    
-    SignatureScriptContent,
-    SignatureScriptLen,
-
-    ScriptPubKeyScriptContent,
-    ScriptPubKeyScriptLen,
+    Script,
+    Signature,
+    ScriptPubKey,
 
     OutputsCount,
     TxOutAmount,

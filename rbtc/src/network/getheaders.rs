@@ -1,7 +1,6 @@
 use crate::encode::error::Error;
 use crate::encode::encode::{Encodable, Decodable};
 use crate::utils::sha256::Sha256;
-use crate::block::varint::VarInt;
 
 use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
@@ -53,15 +52,8 @@ impl Encodable for GetHeaders {
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
         self.version.encode(w).map_err(|_| Error::GetHeadersVersion)?;
-        let locators_len = VarInt::new(self.locators.len() as u64);
-        locators_len.encode(w).map_err(|_| Error::GetHeadersLocatorsCount)?;
-        for locator in &self.locators {
-            let hash = locator.hash;
-            w.write_all(&hash).map_err(|_| Error::GetHeadersLocators)?;
-        }
-
-        let stop = self.stop.hash;
-        w.write_all(&stop).map_err(|_| Error::GetHeadersStop)?;
+        self.locators.encode(w).map_err(|_| Error::GetHeadersLocators)?;
+        self.stop.encode(w).map_err(|_| Error::GetHeadersStop)?;
 
         Ok(())
     }
@@ -70,14 +62,9 @@ impl Decodable for GetHeaders {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<GetHeaders, Error> {
 
-        let version = r.read_u32::<LittleEndian>().map_err(|_| Error::GetHeadersVersion)?;
-        let locators : Vec<Sha256> = decode_locators(r).map_err(|_| Error::GetHeadersLocators)?;
-
-        let mut hash = [0; 32];
-        r.read_exact(&mut hash).map_err(|_| Error::GetHeadersStop)?;
-        let stop = Sha256 {
-            hash: hash
-        };
+        let version = u32::decode(r).map_err(|_| Error::GetHeadersVersion)?;
+        let locators = <Vec<Sha256>>::decode(r).map_err(|_| Error::GetHeadersLocators)?;
+        let stop = Sha256::decode(r).map_err(|_| Error::GetHeadersStop)?;
 
         let result = GetHeaders {
             version: version,
@@ -87,23 +74,6 @@ impl Decodable for GetHeaders {
 
         Ok(result)
     }
-}
-
-fn decode_locators(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Sha256>, Error> {
-
-    let mut result : Vec<Sha256> = Vec::new();
-    let count = VarInt::decode(r).map_err(|_| Error::GetHeadersLocatorsCount)?;
-
-    for _ in 0..count.0 {
-        let mut hash = [0; 32];
-        r.read_exact(&mut hash).map_err(|_| Error::GetHeadersLocator)?;
-        let locator = Sha256 {
-            hash: hash
-        };
-        result.push(locator);
-    }
-    
-    Ok(result)
 }
 
 #[cfg(test)]

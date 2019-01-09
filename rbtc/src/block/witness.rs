@@ -1,6 +1,6 @@
 use crate::encode::error::Error;
 use crate::encode::encode::{Encodable, Decodable};
-use crate::block::varint::VarInt;
+use crate::encode::varint::VarInt;
 
 use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};

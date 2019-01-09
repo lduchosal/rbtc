@@ -1,7 +1,7 @@
 use crate::encode::error::Error;
 use crate::encode::encode::{Encodable, Decodable};
+use crate::encode::varint::VarInt;
 use crate::block::script;
-use crate::block::varint::VarInt;
 
 use crate::block::outpoint::OutPoint;
 use crate::block::script::Script;
@@ -65,15 +65,7 @@ impl Decodable for TxIn {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxIn, Error> {
 
         let previous = OutPoint::decode(r).map_err(|_| Error::TxInOutPoint)?;
-
-        let signature = Script::decode(r)
-            .map_err(|e| {
-                match e {
-                    Error::ScriptContent => Error::SignatureScriptContent,
-                    Error::ScriptLen => Error::SignatureScriptLen,
-                    _ => e
-                }
-            })?;
+        let signature = Script::decode(r).map_err(|_| Error::Signature)?;
         let sequence = u32::decode(r).map_err(|_| Error::TxInSequence)?;
 
         let result = TxIn {

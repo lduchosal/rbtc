@@ -1,7 +1,7 @@
 use crate::encode::error::Error;
 use crate::encode::encode::{Encodable, Decodable};
+use crate::encode::varint::VarInt;
 use crate::block::script;
-use crate::block::varint::VarInt;
 
 use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
@@ -52,14 +52,7 @@ impl Decodable for TxOut {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxOut, Error> {
 
         let amount = u64::decode(r).map_err(|_| Error::TxOutAmount)?;
-        let script_pubkey = Script::decode(r)
-            .map_err(|e| {
-                match e {
-                    Error::ScriptContent => Error::ScriptPubKeyScriptContent,
-                    Error::ScriptLen => Error::ScriptPubKeyScriptLen,
-                    _ => e
-                }
-            })?;
+        let script_pubkey = Script::decode(r).map_err(|e| Error::ScriptPubKey)?;
 
         let result = TxOut {
             amount: amount,

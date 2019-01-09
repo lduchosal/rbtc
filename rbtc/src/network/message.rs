@@ -1,6 +1,6 @@
 use crate::encode::error::Error;
 use crate::encode::encode::{Encodable, Decodable};
-use crate::network::command::CommandString;
+use crate::network::command::{CommandString, Command};
 
 use crate::network::getheaders::GetHeaders;
 use crate::network::getaddr::GetAddr;
@@ -125,40 +125,10 @@ pub enum Payload {
     GetAddr(GetAddr)
 }
 
-#[derive(PartialEq, Debug)]
-pub enum Command {
-    Version,
-    GetHeaders,
-    GetAddr
-}
-
-impl FromStr for Command {
-    type Err = ();
-    fn from_str(s: &str) -> Result<Self, ()> {
-         match s {
-            "version" => Ok(Command::Version),
-            "getheaders" => Ok(Command::GetHeaders),
-            "getaddr" => Ok(Command::GetAddr),
-            _ => Err(())
-        }
-    }
-}
-
-impl ToString for Payload {
-    fn to_string(&self) -> String {
-        match self {
-            Payload::Version(_) => "version",
-            Payload::GetHeaders(_) => "getheaders",
-            Payload::GetAddr(_) => "getaddr",
-            _ => "unknown",
-        }.to_owned()
-    }
-}
-
 impl Payload {
     
     pub fn to_commandstring(&self) -> CommandString {
-        let s = self.to_string();
+        let s = self.to_command().to_string();
         CommandString(s)
     }
 
@@ -173,20 +143,34 @@ impl Payload {
 }
 impl Decodable for Payload {
 
-    pub fn decode(r: Cursor<&Vec<u8>>) -> Result<Payload, Error> {
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Payload, Error> {
 
-        let command = Command::from_str(c.0.as_ref()).map_err(|_| Error::CommandFromStr)?;
+        let commandstring = CommandString::decode(r)?;
+        let payload_len = u32::decode(r).map_err(|_| Error::PayLoadLen)?;
+        let checksum = <[u8; 4]>::decode(r).map_err(|_| Error::PayloadChecksum)?;
+
+        let mut buffer : Vec<u8> = vec![0u8; payload_len as usize];
+        let slice = buffer.as_mut_slice();
+        r.read_exact(slice).map_err(|_| Error::MessagePayLoad)?;
+
+        let checksum2 : [u8; 4] = Message::checksum(&buffer).map_err(|_| Error::PayloadChecksumData)?;
+        if checksum2 != checksum {
+            return Err(Error::PayloadChecksumInvalid);
+        }
+        let mut c = Cursor::new(&buffer);
+
+        let command = commandstring.to_command().map_err(|_| Error::CommandFromStr)?;
         let payload = match command {
             Command::Version => {
-                let message = Version::decode(&mut r)?;
+                let message = Version::decode(&mut c)?;
                 Payload::Version(message)
             },
             Command::GetAddr => {
-                let message = GetAddr::decode(&mut r)?;
+                let message = GetAddr::decode(&mut c)?;
                 Payload::GetAddr(message)
             },
             Command::GetHeaders => {
-                let message = GetHeaders::decode(&mut r)?;
+                let message = GetHeaders::decode(&mut c)?;
                 Payload::GetHeaders(message)
             },
         };
@@ -207,17 +191,15 @@ impl Encodable for Payload {
         }?;
         let payload_len = buffer.len() as u32;
         
-        payload_len.encode(w).map_err(|_| Error::MessagePayLoadLen)?;
+        payload_len.encode(w).map_err(|_| Error::PayLoadLen)?;
 
-        let checksum : [u8; 4] = Message::checksum(&buffer).map_err(|_| Error::MessageChecksum)?;
-        w.write_all(&checksum).map_err(|_| Error::MessageChecksum)?;
-        w.write_all(buffer.as_ref()).map_err(|_| Error::MessagePayLoad)?;
+        let checksum = Message::checksum(&buffer).map_err(|_| Error::PayloadChecksum)?;
+        checksum.encode(w).map_err(|_| Error::PayloadChecksum)?;
+        buffer.encode(w).map_err(|_| Error::MessagePayLoad)?;
 
         Ok(())
     }
 }
-
-
 
 impl Encodable for Message {
 
@@ -234,22 +216,7 @@ impl Decodable for Message {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Message, Error> {
 
         let magic = Magic::decode(r)?;
-        let commandstring = CommandString::decode(r)?;
-        let payload_len = u32::decode(r).map_err(|_| Error::MessagePayLoadLen)?;
-
-        let mut checksum = [0u8; 4];
-        r.read_exact(&mut checksum).map_err(|_| Error::MessageChecksum)?;
-
-        let mut buffer : Vec<u8> = vec![0u8; payload_len as usize];
-        r.read_exact(buffer.as_mut_slice()).map_err(|_| Error::MessagePayLoad)?;
-
-        let checksum2 : [u8; 4] = Message::checksum(&buffer).map_err(|_| Error::MessageChecksum)?;
-        if checksum2 != checksum {
-            return Err(Error::MessageChecksumInvalid);
-        }
-
-        let r = Cursor::new(&buffer);
-        let payload = Payload::decode(&commandstring, r)?;
+        let payload = Payload::decode(r)?;
         let result = Message {
             magic: magic,
             payload: payload

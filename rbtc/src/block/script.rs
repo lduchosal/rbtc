@@ -1,6 +1,5 @@
 use crate::encode::error::Error;
 use crate::encode::encode::{Encodable, Decodable};
-use crate::block::varint::VarInt;
 
 use std::io::{Read, Write, Cursor};
 
@@ -12,11 +11,7 @@ pub struct Script {
 impl Decodable for Script {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Script, Error> {
 
-        let scriptlen = VarInt::decode(r).map_err(|_| Error::ScriptLen)?;
-        let mut content = vec![0u8; scriptlen.0 as usize];
-        let mut content_ref = content.as_mut_slice();
-        r.read_exact(&mut content_ref).map_err(|_| Error::ScriptContent)?;
-
+        let content = <Vec<u8>>::decode(r).map_err(|_| Error::Script)?;
         let result = Script {
             content: content
         };

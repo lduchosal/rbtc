@@ -22,8 +22,7 @@ pub struct OutPoint {
 impl Decodable for OutPoint {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<OutPoint, Error> {
 
-        let mut transaction_hash = [0; 32];
-        r.read_exact(&mut transaction_hash).map_err(|_| Error::OutPointTransactionHash)?;
+        let transaction_hash = <[u8; 32]>::decode(r).map_err(|_| Error::OutPointTransactionHash)?;
         let index = u32::decode(r).map_err(|_| Error::OutPointIndex)?;
 
         let result = OutPoint {

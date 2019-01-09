@@ -103,13 +103,8 @@ impl Decodable for Block {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Block, Error> {
 
         let version = u32::decode(r).map_err(|_| Error::BlockVersion)?;
-
-        let mut previous = [0; 32];
-        r.read_exact(&mut previous).map_err(|_| Error::BlockPrevious)?;
-
-        let mut merkleroot = [0; 32];
-        r.read_exact(&mut merkleroot).map_err(|_| Error::BlockMerkleRoot)?;
-
+        let previous = <[u8; 32]>::decode(r).map_err(|_| Error::BlockPrevious)?;
+        let merkleroot = <[u8; 32]>::decode(r).map_err(|_| Error::BlockMerkleRoot)?;
         let time = u32::decode(r).map_err(|_| Error::BlockTime)?;
         let bits = u32::decode(r).map_err(|_| Error::BlockBits)?;
         let nonce = u32::decode(r).map_err(|_| Error::BlockNonce)?;
