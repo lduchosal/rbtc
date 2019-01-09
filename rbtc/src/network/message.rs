@@ -8,6 +8,8 @@ use crate::network::version;
 use crate::network::verack;
 use crate::network::alert;
 use crate::network::addr;
+use crate::network::ping;
+use crate::network::pong;
 
 use sha2::{Sha256, Digest};
 
@@ -194,7 +196,9 @@ pub enum Payload {
     GetAddr(getaddr::GetAddr),
     VerAck(verack::VerAck),
     Alert(alert::Alert),
-    Addr(addr::Addr)
+    Addr(addr::Addr),
+    Ping(ping::Ping),
+    Pong(pong::Pong),
 }
 
 impl Payload {
@@ -212,6 +216,8 @@ impl Payload {
             Payload::VerAck(_) => Command::VerAck,
             Payload::Alert(_) => Command::Alert,
             Payload::Addr(_) => Command::Addr,
+            Payload::Ping(_) => Command::Ping,
+            Payload::Pong(_) => Command::Pong,
         }
     }
 
@@ -260,6 +266,14 @@ impl Decodable for Payload {
                 let message = addr::Addr::decode(&mut c)?;
                 Payload::Addr(message)
             },
+            Command::Ping => {
+                let message = ping::Ping::decode(&mut c)?;
+                Payload::Ping(message)
+            },
+            Command::Pong => {
+                let message = pong::Pong::decode(&mut c)?;
+                Payload::Pong(message)
+            },
         };
         Ok(payload)
     }
@@ -278,6 +292,8 @@ impl Encodable for Payload {
             Payload::VerAck(ref dat) => dat.encode(&mut buffer),
             Payload::Alert(ref dat) => dat.encode(&mut buffer),
             Payload::Addr(ref dat) => dat.encode(&mut buffer),
+            Payload::Ping(ref dat) => dat.encode(&mut buffer),
+            Payload::Pong(ref dat) => dat.encode(&mut buffer),
         }?;
         let payload_len = buffer.len() as u32;
         

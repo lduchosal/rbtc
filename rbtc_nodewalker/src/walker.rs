@@ -66,7 +66,7 @@ impl NodeWalker {
         Ok(stream)
     }
     /// 
-    /// https://en.bitcoin.it/wiki/Version_Handshake
+    /// https://en.itcoin.it/wiki/Version_Handshake
     /// 
     /// On connect, version and verack messages are exchanged, in order to ensure compatibility between peers.
     /// 
@@ -101,11 +101,14 @@ impl NodeWalker {
     }
 
     fn parse_addr(&self, messages: Vec<Message>) -> Result<Vec<String>, NodeWalkerError> {
-        let result : Vec<String> = Vec::new();
+        let mut result : Vec<String> = Vec::new();
         for message in messages {
             match message.payload {
                 Payload::Addr(addr) => {
-                    
+                    for tna in addr.addrs {
+                        let ip_port = format!("{}:{}", tna.addr.ip, tna.addr.port);
+                        result.push(ip_port);
+                    }
                 },
                 _ => {}
             };
@@ -149,6 +152,10 @@ impl NodeWalker {
                 break;
             }
         }
+
+        let hexcontent2 = hexdump::encode(response.clone());
+        println!("{}", hexcontent2);
+
         let mut cursor = Cursor::new(&response);
         let result = <Vec<Message>>::decode(&mut cursor).map_err(|_| NodeWalkerError::DecodeMessage)?;
         Ok(result)

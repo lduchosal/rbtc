@@ -50,6 +50,9 @@ pub enum Error {
     MessageMagicReverse,
     MessagePayload,
 
+    PingNonce,
+    PongNonce,
+
     Payload,
     PayloadLen,
     PayloadChecksum,
@@ -81,6 +84,7 @@ pub enum Error {
     NetworkAddrIp,
     NetworkAddrPort,
 
+    TimedNetworkCount,
     TimedNetworkAddrTime,
 
     Service,
@@ -140,4 +144,6 @@ pub enum Error {
     
     AlertLen,
     AlertMessage,
+
+    AddrCount,
 }

@@ -1,7 +1,7 @@
 use crate::network::version::Service;
-use crate::network::message::Payload;
 use crate::encode::encode::{Encodable, NetworkEncodable, Decodable, NetworkDecodable};
 use crate::encode::error::Error;
+use crate::encode::varint::VarInt;
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::io::{Read, Write, Cursor};
@@ -72,6 +72,36 @@ impl Encodable for TimedNetworkAddr {
         self.time.encode(w).map_err(|_| Error::TimedNetworkAddrTime)?;
         self.addr.encode(w)?;
         Ok(())
+    }
+}
+
+
+impl Encodable for Vec<TimedNetworkAddr> {
+
+    fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
+
+        let varint = VarInt::new(self.len() as u64);
+        varint.encode(w).map_err(|_| Error::TimedNetworkCount)?;
+        for addr in self {
+            addr.encode(w)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Decodable for Vec<TimedNetworkAddr> {
+
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TimedNetworkAddr>, Error> {
+
+        let mut result: Vec<TimedNetworkAddr> = Vec::new();
+        let varint = VarInt::decode(r).map_err(|_| Error::AddrCount)?;
+        for _ in 0..varint.0 {
+            let addr = TimedNetworkAddr::decode(r)?;
+            result.push(addr);
+        }
+        
+        Ok(result)
     }
 }
 

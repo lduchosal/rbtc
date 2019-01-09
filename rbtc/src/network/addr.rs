@@ -1,5 +1,7 @@
 use crate::encode::error::Error;
+use crate::encode::varint::VarInt;
 use crate::encode::encode::{Encodable, Decodable};
+use crate::network::networkaddr::TimedNetworkAddr;
 
 use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
@@ -55,19 +57,25 @@ use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 /// 
 #[derive(Debug, PartialEq)]
 pub struct Addr {
+    pub addrs: Vec<TimedNetworkAddr>,
 }
 
 impl Encodable for Addr {
 
-    fn encode(&self, _: &mut Vec<u8>) -> Result<(), Error> {
+    fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
+        self.addrs.encode(w)?;
         Ok(())
     }
 }
 
 impl Decodable for Addr {
 
-    fn decode(_: &mut Cursor<&Vec<u8>>) -> Result<Addr, Error> {
-        Ok(Addr {})
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Addr, Error> {
+        let addrs = <Vec<TimedNetworkAddr>>::decode(r)?;
+        let result= Addr {
+            addrs: addrs
+        };
+        Ok(result)
     }
 }
 
@@ -77,6 +85,8 @@ mod test {
     use crate::network::message::Payload;
     use crate::encode::encode::{Encodable, Decodable};
     use crate::network::addr::Addr;
+    use crate::network::networkaddr::TimedNetworkAddr;
+    use crate::network::networkaddr::NetworkAddr;
 
     use std::io::{Read, Write, Cursor};
     use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
@@ -84,22 +94,28 @@ mod test {
     #[test]
     fn when_encode_addr_then_nothing_to_encode() {
 
-        let message = Addr {};
+        let addrs : Vec<TimedNetworkAddr> = Vec::new();
+        let message = Addr {
+            addrs: addrs
+        };        
+        
         let mut data : Vec<u8> = Vec::new();
-
         let result = message.encode(&mut data);
         assert!(result.is_ok());
-        assert_eq!(0, data.len())
+        assert_eq!(1, data.len())
     }
 
     #[test]
     fn when_decode_addr_then_nothing_to_encode() {
 
-        let data : Vec<u8> = Vec::new();
+        let data : Vec<u8> = vec![ 0 ];
         let mut read = Cursor::new(&data);
         let result = Addr::decode(&mut read);
 
-        let expected = Addr {};
+        let addrs : Vec<TimedNetworkAddr> = Vec::new();
+        let expected = Addr {
+            addrs: addrs
+        };
 
         assert!(result.is_ok());
         assert_eq!(expected, result.unwrap());

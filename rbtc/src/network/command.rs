@@ -18,6 +18,8 @@ pub enum Command {
     GetAddr,
     Alert,
     Addr,
+    Ping,
+    Pong,
 }
 
 impl FromStr for Command {
@@ -30,6 +32,8 @@ impl FromStr for Command {
             "verack" => Ok(Command::VerAck),
             "alert" => Ok(Command::Alert),
             "addr" => Ok(Command::Addr),
+            "ping" => Ok(Command::Ping),
+            "pong" => Ok(Command::Pong),
             _ => Err(())
         }
     }
@@ -44,6 +48,8 @@ impl ToString for Command {
             Command::VerAck => "verack",
             Command::Alert => "alert",
             Command::Addr => "addr",
+            Command::Ping => "ping",
+            Command::Pong => "pong",
         }.to_owned()
     }
 }
