@@ -2,6 +2,7 @@
 use crate::utils::sha256::Sha256;
 use crate::network::getheaders::GetHeaders;
 use crate::network::getheaders;
+use crate::encode::encode::{Decodable, Encodable};
 use crate::utils::hexdump;
 
 use std::io::{Read, Write, Cursor};
@@ -26,7 +27,7 @@ fn test() {
     let data : Vec<u8> = hexdump::decode(dump);
     let mut c = Cursor::new(data.as_ref());
     c.set_position(24); // move beyond network protocol headers
-    let result = getheaders::decode(&mut c);
+    let result = GetHeaders::decode(&mut c);
 
     assert_eq!(c.position() as usize, data.len());
     assert!(result.is_ok());

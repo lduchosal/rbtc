@@ -9,6 +9,7 @@ use crate::network::version::Version;
 use sha2::{Sha256, Digest};
 
 use std::fmt;
+use std::str::FromStr;
 use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 
@@ -58,8 +59,9 @@ impl Encodable for Magic {
 
 impl Decodable for Magic {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Magic, Error> {
-        let buffer = [0u8; 4];
+        let mut buffer = [0u8; 4];
         r.read_exact(&mut buffer).map_err(|_| Error::MessageMagic)?;
+        buffer.reverse();
         match buffer {
             [ 0xD9, 0xB4, 0xBE, 0xF9 ] => Ok(Magic::MainNet),
             [ 0x07, 0x09, 0x11, 0x0B ] => Ok(Magic::TestNet),
@@ -72,7 +74,7 @@ impl Decodable for Magic {
 /// https://en.bitcoin.it/wiki/Protocol_documentation
 /// 
 /// Message structure
-/// 
+/// ```
 /// +------------+-------------+-----------+-------------------------------------------------+
 /// | Field Size | Description | Data type | Comments                                        |
 /// +------------+-------------+-----------+-------------------------------------------------+
@@ -90,11 +92,11 @@ impl Decodable for Magic {
 /// +------------+-------------+-----------+-------------------------------------------------+
 /// |    ?       | payload     | uchar[]   | The actual data                                 |
 /// +------------+-------------+-----------+-------------------------------------------------+
-/// </pre>
-
+/// ```
+/// 
 pub struct Message {
     pub magic: Magic,
-    // pub command: Command,
+    // pub command: CommandString,
     // pub length: u32,
     // pub checksum: u32,
     pub payload: Payload
@@ -123,18 +125,24 @@ pub enum Payload {
     GetAddr(GetAddr)
 }
 
-impl Encodable for Payload {
+#[derive(PartialEq, Debug)]
+pub enum Command {
+    Version,
+    GetHeaders,
+    GetAddr
+}
 
-    fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
-        
-        match self {
-            Payload::Version(ref dat) => dat.encode(w),
-            Payload::GetHeaders(ref dat) => dat.encode(w),
-            Payload::GetAddr(ref dat) => dat.encode(w),
+impl FromStr for Command {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, ()> {
+         match s {
+            "version" => Ok(Command::Version),
+            "getheaders" => Ok(Command::GetHeaders),
+            "getaddr" => Ok(Command::GetAddr),
+            _ => Err(())
         }
     }
 }
-
 
 impl ToString for Payload {
     fn to_string(&self) -> String {
@@ -147,23 +155,76 @@ impl ToString for Payload {
     }
 }
 
+impl Payload {
+    
+    pub fn to_commandstring(&self) -> CommandString {
+        let s = self.to_string();
+        CommandString(s)
+    }
+
+    pub fn to_command(&self) -> Command {
+        match self {
+            Payload::Version(_) => Command::Version,
+            Payload::GetHeaders(_) => Command::GetHeaders,
+            Payload::GetAddr(_) => Command::GetAddr
+        }
+    }
+
+}
+impl Decodable for Payload {
+
+    pub fn decode(r: Cursor<&Vec<u8>>) -> Result<Payload, Error> {
+
+        let command = Command::from_str(c.0.as_ref()).map_err(|_| Error::CommandFromStr)?;
+        let payload = match command {
+            Command::Version => {
+                let message = Version::decode(&mut r)?;
+                Payload::Version(message)
+            },
+            Command::GetAddr => {
+                let message = GetAddr::decode(&mut r)?;
+                Payload::GetAddr(message)
+            },
+            Command::GetHeaders => {
+                let message = GetHeaders::decode(&mut r)?;
+                Payload::GetHeaders(message)
+            },
+        };
+        Ok(payload)
+    }
+}
+impl Encodable for Payload {
+
+    fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
+        
+        self.to_commandstring().encode(w)?;
+        
+        let mut buffer : Vec<u8> = Vec::new();
+        match self {
+            Payload::Version(ref dat) => dat.encode(&mut buffer),
+            Payload::GetHeaders(ref dat) => dat.encode(&mut buffer),
+            Payload::GetAddr(ref dat) => dat.encode(&mut buffer),
+        }?;
+        let payload_len = buffer.len() as u32;
+        
+        payload_len.encode(w).map_err(|_| Error::MessagePayLoadLen)?;
+
+        let checksum : [u8; 4] = Message::checksum(&buffer).map_err(|_| Error::MessageChecksum)?;
+        w.write_all(&checksum).map_err(|_| Error::MessageChecksum)?;
+        w.write_all(buffer.as_ref()).map_err(|_| Error::MessagePayLoad)?;
+
+        Ok(())
+    }
+}
+
+
+
 impl Encodable for Message {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
         self.magic.encode(w)?;
         self.payload.encode(w)?;
-        
-        let mut payload : Vec<u8> = Vec::new();
-        self.payload.encode(&mut payload)?;
-        let payload_len = payload.len() as u32;
-        
-        payload_len.encode(w).map_err(|_| Error::MessagePayLoadLen)?;
-
-        let checksum : [u8; 4] = Message::checksum(&payload).map_err(|_| Error::MessageChecksum)?;
-        w.write_all(&checksum).map_err(|_| Error::MessageChecksum)?;
-        w.write_all(payload.as_ref()).map_err(|_| Error::MessagePayLoad)?;
-
         Ok(())
     }
 }
@@ -176,24 +237,19 @@ impl Decodable for Message {
         let commandstring = CommandString::decode(r)?;
         let payload_len = u32::decode(r).map_err(|_| Error::MessagePayLoadLen)?;
 
-        let checksum = [0u8; 4];
+        let mut checksum = [0u8; 4];
         r.read_exact(&mut checksum).map_err(|_| Error::MessageChecksum)?;
 
-        let mut buffer : Vec<u8> = Vec::with_capacity(payload_len as usize);
+        let mut buffer : Vec<u8> = vec![0u8; payload_len as usize];
         r.read_exact(buffer.as_mut_slice()).map_err(|_| Error::MessagePayLoad)?;
 
         let checksum2 : [u8; 4] = Message::checksum(&buffer).map_err(|_| Error::MessageChecksum)?;
         if checksum2 != checksum {
-            Err(Error::MessageChecksumInvalid);
+            return Err(Error::MessageChecksumInvalid);
         }
 
-        let mut r = Cursor::new(&buffer);
-        let payload : Payload = match commandstring.0.as_ref() {
-            "version" => Payload::Version(Version::decode(&mut r)),
-            "getaddr" => Payload::GetAddr(GetAddr::decode(&mut r)),
-            "getheaders" => Payload::GetHeaders(GetHeaders::decode(&mut r)),
-        }?;
-
+        let r = Cursor::new(&buffer);
+        let payload = Payload::decode(&commandstring, r)?;
         let result = Message {
             magic: magic,
             payload: payload
@@ -207,8 +263,8 @@ impl Decodable for Message {
 mod test {
 
     use crate::network::message::Magic;
-    use crate::network::command::Command;
     use crate::network::message::Message;
+    use crate::network::command::CommandString;
     use crate::network::message::Error;
     use crate::network::message::Payload;
     use crate::encode::encode::{Encodable, Decodable};
@@ -228,7 +284,6 @@ mod test {
         let original : Vec<u8> = hexdump::decode(dump);
         
         let payload = Payload::GetAddr(GetAddr { });
-
         let message = Message {
             magic: Magic::MainNet,
             payload: payload

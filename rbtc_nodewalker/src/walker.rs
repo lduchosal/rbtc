@@ -67,10 +67,10 @@ impl NodeWalker {
 
         println!("Connect to {}", node_ip_port);
 
-        let payload = self.payload();
+        let version = self.version();
         let message = Message {
             magic: Magic::MainNet,
-            payload: &payload
+            payload: version
         };
         let mut request : Vec<u8> = Vec::new();
         message.encode(&mut request).map_err(|_| NodeWalkerError::Encode)?;
@@ -114,13 +114,13 @@ impl NodeWalker {
         Ok(result)
     }
 
-    fn payload(&self) -> Version {
+    fn version(&self) -> Payload {
 
         let now = chrono::Local::now();
         let mut rng = rand::thread_rng();
         let nonce: u64 = rng.gen();
 
-        Version {
+        let version = Version {
             version: 70002,
             services: Service::Network,
             timestamp: now.timestamp(),
@@ -138,7 +138,9 @@ impl NodeWalker {
             user_agent: "/rbtc:0.17.0.1/".to_string(),
             start_height: 557409,
             relay: false,
-        }
+        };
+
+        Payload::Version(version)
     }
 
     fn connect(&self, addr: &SocketAddr) -> Result<TcpStream, NodeWalkerError> {

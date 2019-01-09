@@ -128,7 +128,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
-        let result = getheaders::decode(&mut c);
+        let result = GetHeaders::decode(&mut c);
         assert!(result.is_err());
         assert_eq!(c.position(), 0);
 
@@ -148,7 +148,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
-        let result = getheaders::decode(&mut c);
+        let result = GetHeaders::decode(&mut c);
         assert!(result.is_err());
         assert_eq!(c.position(), 0);
 
@@ -168,7 +168,7 @@ mod test {
 
         let data : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(data.as_ref());
-        let result = getheaders::decode(&mut c);
+        let result = GetHeaders::decode(&mut c);
         assert!(result.is_err());
         assert_eq!(c.position(), 4);
 
@@ -197,7 +197,7 @@ mod test {
         let mut c = Cursor::new(data.as_ref());
         c.set_position(24); // move beyond network protocol headers
 
-        let result = getheaders::decode(&mut c);
+        let result = GetHeaders::decode(&mut c);
         assert!(result.is_ok());
         assert_eq!(c.position() as usize, data.len());
 
@@ -240,7 +240,7 @@ mod test {
         let original : Vec<u8> = hexdump::decode(dump);
         let mut c = Cursor::new(original.as_ref());
 
-        let decoded = getheaders::decode(&mut c);
+        let decoded = GetHeaders::decode(&mut c);
         assert!(decoded.is_ok());
         assert_eq!(c.position() as usize, original.len());
 

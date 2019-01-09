@@ -5,10 +5,10 @@ use tokio::net::TcpStream;
 use tokio::prelude::*;
 
 use crate::utils::sha256::Sha256;
-use crate::network::message::Payload;
 use crate::encode::encode::{Encodable, Decodable};
+use crate::network::command::CommandString;
 use crate::network::getheaders::GetHeaders;
-use crate::network::message::{Message, Magic};
+use crate::network::message::{Payload, Message, Magic};
 
 #[test]
 fn test() {
@@ -41,10 +41,9 @@ fn test() {
         locators: locators,
         stop: stop
     };
-
     let message = Message {
         magic: Magic::MainNet,
-        payload: &getheadermessage
+        payload: Payload::GetHeaders(getheadermessage)
     };
 
     let mut data : Vec<u8> = Vec::new();

@@ -13,7 +13,7 @@ impl Encodable for CommandString {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
-        let mut command = format!("{:?}\0\0\0\0\0\0\0\0\0\0\0\0", self.0.to_string())
+        let mut command = format!("{:}\0\0\0\0\0\0\0\0\0\0\0\0", self.0)
             .to_lowercase();
         command.truncate(12);
         w.write_all(command.as_bytes()).map_err(|_| Error::Command)?;
@@ -22,12 +22,11 @@ impl Encodable for CommandString {
     }
 }
 
-
 impl Decodable for CommandString {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<CommandString, Error> {
         
-        let buffer = [0u8; 12];
+        let mut buffer = [0u8; 12];
         r.read_exact(&mut buffer).map_err(|_| Error::Command)?;
         let s = String::from_utf8(buffer.to_vec()).map_err(|_| Error::CommandDecode)?;
         let result = CommandString(s);

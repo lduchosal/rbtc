@@ -1,6 +1,9 @@
 use crate::utils::hexdump;
 use crate::encode::encode::{Encodable, Decodable};
 use crate::network::message::Message;
+
+use std::io::Cursor;
+
 #[test]
 fn test() {
 
@@ -32,7 +35,8 @@ fn test() {
     let data : Vec<u8> = hexdump::decode(dump);
     assert_eq!(data.len(), 0x158);
 
-    let message = Message::decode(data);
+    let mut r = Cursor::new(&data);
+    let message = Message::decode(&mut r);
     assert!(message.is_ok());
 
 }
