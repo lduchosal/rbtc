@@ -3,9 +3,9 @@ use crate::encode::encode::{Encodable, Decodable};
 use crate::encode::varint::VarInt;
 use crate::block::witness;
 
-use crate::block::txout::TxOuts;
-use crate::block::txin::TxIns;
-use crate::block::witness::Witnesses;
+use crate::block::txout::TxOut;
+use crate::block::txin::TxIn;
+use crate::block::witness::Witness;
 
 use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
@@ -33,7 +33,7 @@ use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 /// | list of outputs |  the outputs of the first transaction spend  | <out-counter>-many outputs   | 
 /// |                 |  the mined bitcoins for the block            |                              | 
 /// +-----------------+----------------------------------------------+------------------------------+ 
-/// | Witnesses       |  A list of witnesses, 1 for each input,      | variable                     | 
+/// | Vec<Witness>       |  A list of witnesses, 1 for each input,      | variable                     | 
 /// |                 |  omitted if flag above is missing	,        | see Segregated_Witness       | 
 /// +-----------------+----------------------------------------------+------------------------------+ 
 /// | lock_time       |  if non-zero and sequence numbers are        | 4 bytes                      | 
@@ -52,9 +52,9 @@ use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 pub struct Transaction {
     pub version: i32,
     pub flag: Option<u16>,
-    pub inputs: TxIns,
-    pub outputs: TxOuts,
-    pub witness: Option<Witnesses>,
+    pub inputs: Vec<TxIn>,
+    pub outputs: Vec<TxOut>,
+    pub witness: Option<Vec<Witness>>,
     pub locktime: u32
 }
 
@@ -85,11 +85,11 @@ impl Decodable for Transaction {
             r.set_position(position);
         };
 
-        let inputs = TxIns::decode(r)?;
-        let outputs = TxOuts::decode(r)?;
+        let inputs = <Vec<TxIn>>::decode(r)?;
+        let outputs = <Vec<TxOut>>::decode(r)?;
 
         let witnesses = match flag {
-            Some(_) => Some(Witnesses::decode(r)?),
+            Some(_) => Some(<Vec<Witness>>::decode(r)?),
             _ => None
         };
 

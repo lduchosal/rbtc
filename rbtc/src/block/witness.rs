@@ -10,29 +10,16 @@ pub struct Witness {
     pub data: Vec<u8>
 }
 
-#[derive(Debug)]
-pub struct Witnesses (Vec<Witness>);
-
-impl Witnesses {
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-    pub fn get(&self, index: usize) -> Option<&Witness> {
-        self.0.get(index)
-    }
-}
-
-impl Decodable for Witnesses {
+impl Decodable for Vec<Witness> {
         
-    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Witnesses, Error> {
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Witness>, Error> {
 
-        let mut witnesses: Vec<Witness> = Vec::new();
+        let mut result: Vec<Witness> = Vec::new();
         let count = VarInt::decode(r).map_err(|_| Error::WitnessesCount)?;
         for _ in 0..count.0 {
             let witness = Witness::decode(r)?;
-            witnesses.push(witness);
+            result.push(witness);
         }
-        let result = Witnesses(witnesses);
 
         Ok(result)
     }

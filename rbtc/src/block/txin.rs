@@ -31,30 +31,16 @@ pub struct TxIn {
     pub sequence: u32,
 } 
 
-#[derive(Debug)]
-pub struct TxIns (Vec<TxIn>);
-
-impl TxIns {
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-    pub fn get(&self, index: usize) -> Option<&TxIn> {
-        self.0.get(index)
-    }
-}
-
-
-impl Decodable for TxIns {
+impl Decodable for Vec<TxIn> {
     
-    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxIns, Error> {
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxIn>, Error> {
 
-        let mut txins : Vec<TxIn> = Vec::new();
+        let mut result : Vec<TxIn> = Vec::new();
         let count = VarInt::decode(r).map_err(|_| Error::InputsCount)?;
         for _ in 0..count.0 {
             let input = TxIn::decode(r)?;
-            txins.push(input);
+            result.push(input);
         }
-        let result = TxIns(txins);
         Ok(result)
     }
 }

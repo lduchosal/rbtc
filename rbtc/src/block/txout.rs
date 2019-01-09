@@ -17,31 +17,17 @@ pub struct TxOut {
     pub script_pubkey: Script // scriptPubKey
 } 
 
-#[derive(Debug)]
-pub struct TxOuts (Vec<TxOut>);
+impl Decodable for Vec<TxOut> {
 
-impl TxOuts {
-    pub fn len(&self) -> usize {
-        self.0.len()
-    }
-    pub fn get(&self, index: usize) -> Option<&TxOut> {
-        self.0.get(index)
-    }
-}
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxOut>, Error> {
 
-impl Decodable for TxOuts {
-
-    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxOuts, Error> {
-
-        let mut txouts : Vec<TxOut> = Vec::new();
+        let mut result : Vec<TxOut> = Vec::new();
         let count = VarInt::decode(r).map_err(|_| Error::OutputsCount)?;
 
         for _ in 0..count.0 {
             let output = TxOut::decode(r)?;
-            txouts.push(output);
+            result.push(output);
         }
-
-        let result = TxOuts(txouts);
 
         Ok(result)
     }
@@ -52,7 +38,7 @@ impl Decodable for TxOut {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxOut, Error> {
 
         let amount = u64::decode(r).map_err(|_| Error::TxOutAmount)?;
-        let script_pubkey = Script::decode(r).map_err(|e| Error::ScriptPubKey)?;
+        let script_pubkey = Script::decode(r).map_err(|_| Error::ScriptPubKey)?;
 
         let result = TxOut {
             amount: amount,
