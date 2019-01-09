@@ -64,33 +64,34 @@ pub struct Version {
 /// |    8  | NODE_WITNESS         | See BIP 0144                                                    | 
 /// | 1024  | NODE_NETWORK_LIMITED | See BIP 0159                                                    |
 /// +-------+----------------------+-----------------------------------------------------------------+
-/// 
-#[derive(Debug, PartialEq, Clone)]
-pub enum Service {
-    Network = 1,
-    GetUtxo = 2,
-    Bloom = 4,
-    Witness = 8,
-    NetworkLimited = 1024,
-}
 
-impl Service {
-    pub fn from_value(value :u64) -> Result<Service, Error> {
-        match value {
-            1 => Ok(Service::Network),
-            2 => Ok(Service::GetUtxo),
-            4 => Ok(Service::Bloom),
-            8 => Ok(Service::Witness),
-            1024 => Ok(Service::NetworkLimited),
-            _ => Err(Error::ServiceMatch)
-        }
+
+bitflags! {
+    pub struct Service : u64 {
+        const Network = 1;
+        const GetUtxo = 2;
+        const Bloom = 4;
+        const Witness = 8;
+        const NetworkLimited = 1024;
     }
 }
 
+// impl Service {
+//     pub fn from_value(value :u64) -> Result<Service, Error> {
+//         match value {
+//             1 => Ok(Service::Network),
+//             2 => Ok(Service::GetUtxo),
+//             4 => Ok(Service::Bloom),
+//             8 => Ok(Service::Witness),
+//             1024 => Ok(Service::NetworkLimited),
+//             _ => Err(Error::ServiceMatch)
+//         }
+//     }
+// }
+
 impl Encodable for Service {
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
-        let clone = self.clone() as u64;
-        clone.encode(w).map_err(|_| Error::Service)?;
+        self.bits().encode(w).map_err(|_| Error::Service)?;
         Ok(())
     }
 }
@@ -98,7 +99,11 @@ impl Encodable for Service {
 impl Decodable for Service {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Service, Error> {
         let value = u64::decode(r).map_err(|_| Error::Service)?;
-        Service::from_value(value)
+        let flag = Service::from_bits(value);
+        match flag {
+            Some(result) => Ok(result),
+            None => Err(Error::serviceInvalid)
+        }
     }
 }
 

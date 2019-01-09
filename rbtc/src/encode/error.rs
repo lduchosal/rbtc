@@ -43,6 +43,8 @@ pub enum Error {
     Magic,
     
     MessageNotFound,
+    MessageEmpty,
+    MessageNotReadFully,
 
     MessageMagic,
     MessageMagicReverse,
@@ -83,6 +85,7 @@ pub enum Error {
 
     Service,
     ServiceMatch,
+    serviceInvalid,
 
     IpAddr,
     IpAddrB1,
@@ -133,5 +136,8 @@ pub enum Error {
     VarIntFF,
 
     OutPointTransactionHash,
-    OutPointIndex
+    OutPointIndex,
+    
+    AlertLen,
+    AlertMessage,
 }

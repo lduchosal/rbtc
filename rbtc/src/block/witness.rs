@@ -32,8 +32,7 @@ impl Decodable for Witness {
         let varlen = VarInt::decode(r).map_err(|_| Error::WitnessLen)?;
         let mut data = vec![0u8; varlen.0 as usize];
         let mut data_ref = data.as_mut_slice();
-        r.read_exact(&mut data_ref)
-            .map_err(|_| Error::WitnessData)?;
+        r.read_exact(&mut data_ref).map_err(|_| Error::WitnessData)?;
 
         let result = Witness { data: data };
 

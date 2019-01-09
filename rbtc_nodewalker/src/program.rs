@@ -25,14 +25,12 @@ impl Program {
     }
 
     pub fn run(&self) {
-        loop {
-            self.seed();
-            self.report();
-            self.walk();
+        self.seed();
+        self.report();
+        self.walk();
 
-            let one_sec = time::Duration::from_secs(10);
-            thread::sleep(one_sec);
-        };
+        let ten_sec = time::Duration::from_secs(10);
+        thread::sleep(ten_sec);
     }
 
     fn seed(&self) {

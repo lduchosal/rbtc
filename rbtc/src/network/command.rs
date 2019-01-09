@@ -13,8 +13,10 @@ pub struct CommandString(pub String);
 #[derive(PartialEq, Debug)]
 pub enum Command {
     Version,
+    VerAck,
     GetHeaders,
-    GetAddr
+    GetAddr,
+    Alert,
 }
 
 impl FromStr for Command {
@@ -24,6 +26,8 @@ impl FromStr for Command {
             "version" => Ok(Command::Version),
             "getheaders" => Ok(Command::GetHeaders),
             "getaddr" => Ok(Command::GetAddr),
+            "verack" => Ok(Command::VerAck),
+            "alert" => Ok(Command::Alert),
             _ => Err(())
         }
     }
@@ -35,6 +39,8 @@ impl ToString for Command {
             Command::Version => "version",
             Command::GetHeaders => "getheaders",
             Command::GetAddr => "getaddr",
+            Command::VerAck => "verack",
+            Command::Alert => "alert",
         }.to_owned()
     }
 }
@@ -79,7 +85,6 @@ mod test {
     use crate::utils::hexdump;
 
     use std::io::{Write, Read, Cursor};
-    use std::net::IpAddr;
 
      #[test]
     fn when_command_getaddr_then_sucess() {

@@ -36,13 +36,15 @@ fn test() {
     assert_eq!(data.len(), 0x158);
 
     let mut r = Cursor::new(&data);
-    let message = <Vec<Message>>::decode(&mut r);
+    let decoded = <Vec<Message>>::decode(&mut r);
     
-    println!("{:?}", message);
+    println!("{:?}", decoded);
 
-    assert!(message.is_ok());
+    assert!(decoded.is_ok());
 
-    let version = message.unwrap();
-    version.
+    let messages = decoded.unwrap();
+    for message in messages {
+        println!("{:?}", message);
+    }
 
 }
