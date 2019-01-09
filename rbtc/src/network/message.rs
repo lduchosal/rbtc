@@ -94,6 +94,8 @@ impl Decodable for Magic {
 /// +------------+-------------+-----------+-------------------------------------------------+
 /// ```
 /// 
+/// 
+#[derive(Debug)]
 pub struct Message {
     pub magic: Magic,
     // pub command: CommandString,
@@ -117,6 +119,51 @@ impl Message {
         Ok(hash)
     }
 }
+
+impl Encodable for Message {
+
+    fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
+
+        self.magic.encode(w)?;
+        self.payload.encode(w)?;
+        Ok(())
+    }
+}
+
+impl Decodable for Message {
+
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Message, Error> {
+
+        let magic = Magic::decode(r)?;
+        let payload = Payload::decode(r)?;
+        let result = Message {
+            magic: magic,
+            payload: payload
+        };
+        Ok(result)
+    }
+}
+
+impl Decodable for Vec<Message> {
+
+    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Message>, Error> {
+
+        let result = Vec::new();
+        loop {
+            let decode = Message::decode(r);
+            if decode.is_err() {
+                break;
+            }
+            result.push(decode.unwrap());
+        }
+
+        if (result.len() == 0) {
+            return Err(Error::MessageNotFound);
+        }
+        Ok(result);
+    }
+}
+  
 
 #[derive(Debug)]
 pub enum Payload {
@@ -145,13 +192,13 @@ impl Decodable for Payload {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Payload, Error> {
 
-        let commandstring = CommandString::decode(r)?;
-        let payload_len = u32::decode(r).map_err(|_| Error::PayLoadLen)?;
+        let commandstring = CommandString::decode(r).map_err(|_| Error::PayloadCommandString)?;
+        let payload_len = u32::decode(r).map_err(|_| Error::PayloadLen)?;
         let checksum = <[u8; 4]>::decode(r).map_err(|_| Error::PayloadChecksum)?;
 
         let mut buffer : Vec<u8> = vec![0u8; payload_len as usize];
         let slice = buffer.as_mut_slice();
-        r.read_exact(slice).map_err(|_| Error::MessagePayLoad)?;
+        r.read_exact(slice).map_err(|_| Error::MessagePayload)?;
 
         let checksum2 : [u8; 4] = Message::checksum(&buffer).map_err(|_| Error::PayloadChecksumData)?;
         if checksum2 != checksum {
@@ -191,40 +238,16 @@ impl Encodable for Payload {
         }?;
         let payload_len = buffer.len() as u32;
         
-        payload_len.encode(w).map_err(|_| Error::PayLoadLen)?;
+        payload_len.encode(w).map_err(|_| Error::PayloadLen)?;
 
         let checksum = Message::checksum(&buffer).map_err(|_| Error::PayloadChecksum)?;
         checksum.encode(w).map_err(|_| Error::PayloadChecksum)?;
-        buffer.encode(w).map_err(|_| Error::MessagePayLoad)?;
+        buffer.encode(w).map_err(|_| Error::MessagePayload)?;
 
         Ok(())
     }
 }
 
-impl Encodable for Message {
-
-    fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
-
-        self.magic.encode(w)?;
-        self.payload.encode(w)?;
-        Ok(())
-    }
-}
-
-impl Decodable for Message {
-
-    fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Message, Error> {
-
-        let magic = Magic::decode(r)?;
-        let payload = Payload::decode(r)?;
-        let result = Message {
-            magic: magic,
-            payload: payload
-        };
-        Ok(result)
-    }
-}
-  
 
 #[cfg(test)]
 mod test {

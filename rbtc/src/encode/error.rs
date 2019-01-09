@@ -42,16 +42,19 @@ pub enum Error {
 
     Magic,
     
+    MessageNotFound,
+
     MessageMagic,
     MessageMagicReverse,
-    PayLoadLen,
-    MessagePayLoad,
+    MessagePayload,
+
+    Payload,
+    PayloadLen,
     PayloadChecksum,
     PayloadChecksumData,
     PayloadChecksumInvalid,
-
-    Payload,
     PayloadUnknown,
+    PayloadCommandString,
 
     GetHeadersVersion,
     GetHeadersLocatorsCount,

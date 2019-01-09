@@ -94,7 +94,7 @@ mod test {
 
 
         if let Err(e) = parsescript {
-            assert_eq!(e, Error::ScriptContent);
+            assert_eq!(e, Error::Script);
         } else {
             panic!("should have failed");
         }
@@ -110,7 +110,7 @@ mod test {
         assert!(parsescript.is_err());
 
         if let Err(e) = parsescript {
-            assert_eq!(e, Error::ScriptLen);
+            assert_eq!(e, Error::Script);
         } else {
             panic!("should have failed");
         }

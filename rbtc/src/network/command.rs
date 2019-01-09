@@ -7,6 +7,7 @@ use std::string::ToString;
 use std::io::{Read, Write, Cursor};
 use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 
+#[derive(PartialEq, Debug)]
 pub struct CommandString(pub String);
 
 #[derive(PartialEq, Debug)]
@@ -61,10 +62,64 @@ impl Decodable for CommandString {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<CommandString, Error> {
         
-        let mut buffer = [0u8; 12];
-        r.read_exact(&mut buffer).map_err(|_| Error::Command)?;
-        let s = String::from_utf8(buffer.to_vec()).map_err(|_| Error::CommandDecode)?;
+        let buffer = <[u8; 12]>::decode(r).map_err(|_| Error::Command)?;
+        let mut s = String::from_utf8(buffer.to_vec()).map_err(|_| Error::CommandDecode)?;
+        s.retain(|c| c != (0 as char));
+
         let result = CommandString(s);
         Ok(result)
     }
+}
+
+#[cfg(test)]
+mod test {
+
+    use crate::network::command::CommandString;
+    use crate::encode::encode::{Encodable, Decodable};
+    use crate::utils::hexdump;
+
+    use std::io::{Write, Read, Cursor};
+    use std::net::IpAddr;
+
+     #[test]
+    fn when_command_getaddr_then_sucess() {
+        let dump = "
+00000000   67 65 74 61 64 64 72 00  00 00 00 00               getaddr.......
+";
+
+        // This message is from a satoshi node, morning of May 27 2014
+        let original : Vec<u8> = hexdump::decode(dump);
+        let mut hex = Cursor::new(&original);
+
+        let decode = CommandString::decode(&mut hex);
+        assert!(decode.is_ok());
+
+        let result = decode.unwrap();
+
+        let expected = CommandString("getaddr".to_string());
+
+        assert_eq!(expected, result);
+    }
+
+
+     #[test]
+    fn when_command_version_then_sucess() {
+        let dump = "
+00000000   76 65 72 73 69 6f 6e 00  00 00 00 00               version......
+";
+
+        // This message is from a satoshi node, morning of May 27 2014
+        let original : Vec<u8> = hexdump::decode(dump);
+        let mut hex = Cursor::new(&original);
+
+        let decode = CommandString::decode(&mut hex);
+        assert!(decode.is_ok());
+
+        let result = decode.unwrap();
+
+        let expected = CommandString("version".to_string());
+
+        assert_eq!(expected, result);
+    }
+
 }

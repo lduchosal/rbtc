@@ -89,7 +89,7 @@ impl Encodable for VarInt {
 #[cfg(test)]
 mod test {
 
-    use crate::block::varint::VarInt;
+    use crate::encode::varint::VarInt;
     use crate::encode::error::Error;
     use crate::encode::encode::{Encodable, Decodable};
     
