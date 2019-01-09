@@ -2,11 +2,12 @@ use crate::encode::error::Error;
 use crate::encode::encode::{Encodable, Decodable};
 use crate::network::command::{CommandString, Command};
 
-use crate::network::getheaders::GetHeaders;
-use crate::network::getaddr::GetAddr;
-use crate::network::version::Version;
-use crate::network::verack::VerAck;
-use crate::network::alert::Alert;
+use crate::network::getheaders;
+use crate::network::getaddr;
+use crate::network::version;
+use crate::network::verack;
+use crate::network::alert;
+use crate::network::addr;
 
 use sha2::{Sha256, Digest};
 
@@ -151,7 +152,6 @@ impl Decodable for Vec<Message> {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Message>, Error> {
 
         let len = (*r.get_ref()).len();
-
         if len == 0{
             return Err(Error::MessageEmpty);
         }
@@ -168,7 +168,6 @@ impl Decodable for Vec<Message> {
         if result.len() == 0 {
             return Err(Error::MessageNotFound);
         }
-
         if r.position() as usize != len {
             return Err(Error::MessageNotReadFully);
         }
@@ -176,15 +175,26 @@ impl Decodable for Vec<Message> {
         Ok(result)
     }
 }
+
+impl Encodable for Vec<Message> {
+
+    fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
+        for message in self {
+            message.encode(w)?;
+        }
+        Ok(())
+    }
+}
   
 
 #[derive(Debug)]
 pub enum Payload {
-    Version(Version),
-    GetHeaders(GetHeaders),
-    GetAddr(GetAddr),
-    VerAck(VerAck),
-    Alert(Alert),
+    Version(version::Version),
+    GetHeaders(getheaders::GetHeaders),
+    GetAddr(getaddr::GetAddr),
+    VerAck(verack::VerAck),
+    Alert(alert::Alert),
+    Addr(addr::Addr)
 }
 
 impl Payload {
@@ -201,6 +211,7 @@ impl Payload {
             Payload::GetAddr(_) => Command::GetAddr,
             Payload::VerAck(_) => Command::VerAck,
             Payload::Alert(_) => Command::Alert,
+            Payload::Addr(_) => Command::Addr,
         }
     }
 
@@ -226,24 +237,28 @@ impl Decodable for Payload {
         let command = commandstring.to_command().map_err(|_| Error::CommandFromStr)?;
         let payload = match command {
             Command::Version => {
-                let message = Version::decode(&mut c)?;
+                let message = version::Version::decode(&mut c)?;
                 Payload::Version(message)
             },
             Command::GetAddr => {
-                let message = GetAddr::decode(&mut c)?;
+                let message = getaddr::GetAddr::decode(&mut c)?;
                 Payload::GetAddr(message)
             },
             Command::GetHeaders => {
-                let message = GetHeaders::decode(&mut c)?;
+                let message = getheaders::GetHeaders::decode(&mut c)?;
                 Payload::GetHeaders(message)
             },
             Command::VerAck => {
-                let message = VerAck::decode(&mut c)?;
+                let message = verack::VerAck::decode(&mut c)?;
                 Payload::VerAck(message)
             },
             Command::Alert => {
-                let message = Alert::decode(&mut c)?;
+                let message = alert::Alert::decode(&mut c)?;
                 Payload::Alert(message)
+            },
+            Command::Addr => {
+                let message = addr::Addr::decode(&mut c)?;
+                Payload::Addr(message)
             },
         };
         Ok(payload)
@@ -262,6 +277,7 @@ impl Encodable for Payload {
             Payload::GetAddr(ref dat) => dat.encode(&mut buffer),
             Payload::VerAck(ref dat) => dat.encode(&mut buffer),
             Payload::Alert(ref dat) => dat.encode(&mut buffer),
+            Payload::Addr(ref dat) => dat.encode(&mut buffer),
         }?;
         let payload_len = buffer.len() as u32;
         

@@ -28,12 +28,10 @@ fn main() {
 
     let resolver = resolver::Resolver::new(config.dns_seeds);
     let provider = provider::NodeProvider::new(&config.sqlite_path).unwrap();
-    let walker = walker::NodeWalker::new();
 
     let program = program::Program::new(
         resolver,
-        provider,
-        walker
+        provider
     );
     program.run();
 }

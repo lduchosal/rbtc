@@ -1,5 +1,7 @@
 use rbtc::network::networkaddr::NetworkAddr;
 use rbtc::network::version::Version;
+use rbtc::network::verack::VerAck;
+use rbtc::network::getaddr::GetAddr;
 use rbtc::network::version::Service;
 use rbtc::network::message::Payload;
 use rbtc::network::message::{Message, Magic};
@@ -12,7 +14,7 @@ use rand::Rng;
 use std::net::{TcpStream, IpAddr, SocketAddr};
 use std::io::prelude::*;
 use std::fmt;
-use std::io::{Error, ErrorKind};
+use std::io::{Cursor, Error, ErrorKind};
 
 #[derive(Debug)]
 pub enum NodeWalkerError {
@@ -22,7 +24,8 @@ pub enum NodeWalkerError {
     Read,
     Write,
     WriteTimeout,
-    Shutdown
+    Shutdown,
+    DecodeMessage
 }
 
 impl fmt::Display for NodeWalkerError {
@@ -32,16 +35,36 @@ impl fmt::Display for NodeWalkerError {
 }
 
 pub struct NodeWalker {
-
+    stream: Option<TcpStream>,
+    addr: SocketAddr,
 }
 
 impl NodeWalker {
 
-    pub fn new() -> NodeWalker {
+    pub fn new(nodeip: &String) -> NodeWalker {
+
+        let mut node_ip_port = nodeip.clone();
+        node_ip_port.push_str(":8333");
+        let addr : SocketAddr = node_ip_port.parse().unwrap();
+
         NodeWalker {
+            stream: None,
+            addr: addr,
         }
     }
 
+    fn connect(&self) -> Result<TcpStream, NodeWalkerError> {
+
+        let connect_timeout = std::time::Duration::from_secs(3);
+        let read_timeout = std::time::Duration::from_secs(10);
+        let write_timeout = std::time::Duration::from_secs(5);
+
+        let stream = TcpStream::connect_timeout(&self.addr, connect_timeout).map_err(|_| NodeWalkerError::Connect)?;
+        stream.set_read_timeout(Option::Some(read_timeout)).map_err(|_| NodeWalkerError::ReadTimeout)?;
+        stream.set_write_timeout(Option::Some(write_timeout)).map_err(|_| NodeWalkerError::WriteTimeout)?;
+
+        Ok(stream)
+    }
     /// 
     /// https://en.bitcoin.it/wiki/Version_Handshake
     /// 
@@ -59,25 +82,47 @@ impl NodeWalker {
     /// 
     /// Note: Versions below 31800 are no longer supported.
     /// 
-    pub fn walk(&self, nodeip: &String) -> Result<Vec<String>, NodeWalkerError> {
+    pub fn walk(&self) -> Result<Vec<String>, NodeWalkerError> {
 
-        let mut node_ip_port = nodeip.clone();
-        node_ip_port.push_str(":8333");
-        let addr : SocketAddr = node_ip_port.parse().unwrap();
-
-        println!("Connect to {}", node_ip_port);
+        let mut stream = self.connect()?;
 
         let version = self.version();
-        let message = Message {
-            magic: Magic::MainNet,
-            payload: version
-        };
+        let verack = self.send(&mut stream, version)?;
+
+        println!("{:?}", verack);
+
+        let verack_getaddr = self.verack_getaddr();
+        let addr = self.send(&mut stream, verack_getaddr)?;
+
+        println!("{:?}", addr);
+
+        let result = self.parse_addr(addr)?;
+        Ok(result)
+    }
+
+    fn parse_addr(&self, messages: Vec<Message>) -> Result<Vec<String>, NodeWalkerError> {
+        let result : Vec<String> = Vec::new();
+        for message in messages {
+            match message.payload {
+                Payload::Addr(addr) => {
+                    
+                },
+                _ => {}
+            };
+        }
+
+        Ok(result)
+    }
+
+    fn send(&self, stream: &mut TcpStream, messages: Vec<Message>) -> Result<Vec<Message>, NodeWalkerError> {
+
         let mut request : Vec<u8> = Vec::new();
-        message.encode(&mut request).map_err(|_| NodeWalkerError::Encode)?;
+        messages.encode(&mut request).map_err(|_| NodeWalkerError::Encode)?;
+
         let hexcontent = hexdump::encode(request.clone());
         println!("{}", hexcontent);
 
-        let mut stream = self.connect(&addr)?;
+
         stream.write(&request).map_err(|_| NodeWalkerError::Write)?;
 
         let mut response : Vec<u8> = Vec::new();
@@ -104,17 +149,12 @@ impl NodeWalker {
                 break;
             }
         }
-
-        // stream.shutdown(Shutdown::Both).map_err(|_| NodeWalkerError::Shutdown)?;
-        let encoded  = hexdump::encode(response);
-        let mut result : Vec<String> = Vec::new();
-        for line in encoded.lines() {
-            result.push(line.to_string());
-        }
+        let mut cursor = Cursor::new(&response);
+        let result = <Vec<Message>>::decode(&mut cursor).map_err(|_| NodeWalkerError::DecodeMessage)?;
         Ok(result)
     }
 
-    fn version(&self) -> Payload {
+    fn version(&self) -> Vec<Message> {
 
         let now = chrono::Local::now();
         let mut rng = rand::thread_rng();
@@ -140,21 +180,36 @@ impl NodeWalker {
             relay: false,
         };
 
-        Payload::Version(version)
+        let version = Payload::Version(version);
+        vec![
+            Message {
+                magic: Magic::MainNet,
+                payload: version
+            }
+        ]
     }
 
-    fn connect(&self, addr: &SocketAddr) -> Result<TcpStream, NodeWalkerError> {
+    fn verack_getaddr(&self) -> Vec<Message> {
 
-        let connect_timeout = std::time::Duration::from_secs(3);
-        let read_timeout = std::time::Duration::from_secs(10);
-        let write_timeout = std::time::Duration::from_secs(5);
+        let now = chrono::Local::now();
+        let mut rng = rand::thread_rng();
+        let nonce: u64 = rng.gen();
 
-        let stream = TcpStream::connect_timeout(addr, connect_timeout).map_err(|_| NodeWalkerError::Connect)?;
-        stream.set_read_timeout(Option::Some(read_timeout)).map_err(|_| NodeWalkerError::ReadTimeout)?;
-        stream.set_write_timeout(Option::Some(write_timeout)).map_err(|_| NodeWalkerError::WriteTimeout)?;
-
-        Ok(stream)
+        let verack = Payload::VerAck(VerAck {});
+        let getaddr = Payload::GetAddr(GetAddr {});
+        
+        vec![
+            Message {
+                magic: Magic::MainNet,
+                payload: verack
+            },
+            Message {
+                magic: Magic::MainNet,
+                payload: getaddr
+            },
+        ]
     }
+
 }
 
 #[cfg(test)]
@@ -165,25 +220,23 @@ mod test {
     #[test]
     fn when_walker_walk_localhost_then_return_some_strings() {
 
-        let walker = NodeWalker::new();
         let node = String::from("127.0.0.1");
-        let result = walker.walk(&node);
+        let walker = NodeWalker::new(&node);
+        let result = walker.walk();
 
         assert!(result.is_ok());
 
         for line in result.unwrap() {
             println!("{}", line);
         }
-
-        
     }
 
     #[test]
     fn when_walker_walk_workinghost_then_return_some_strings() {
 
-        let walker = NodeWalker::new();
         let node = String::from("142.93.2.255");
-        let result = walker.walk(&node);
+        let walker = NodeWalker::new(&node);
+        let result = walker.walk();
 
         assert!(result.is_ok());
 

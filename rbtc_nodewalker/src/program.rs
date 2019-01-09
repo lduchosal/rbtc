@@ -7,7 +7,6 @@ use std::{thread, time};
 pub struct Program {
     resolver: resolver::Resolver,
     provider: provider::NodeProvider,
-    walker: walker::NodeWalker
 }
 
 impl Program {
@@ -15,12 +14,10 @@ impl Program {
     pub fn new(
         resolver: resolver::Resolver,
         provider: provider::NodeProvider,
-        walker: walker::NodeWalker
     ) -> Program {
         Program {
             resolver: resolver,
             provider: provider,
-            walker: walker,
         }
     }
 
@@ -65,7 +62,9 @@ impl Program {
         let nodes = self.provider.all().unwrap();
         for node in nodes {
             let src = node.ip;
-            let walked = self.walker.walk(&src);
+
+            let walker = walker::NodeWalker::new(&src);
+            let walked = walker.walk();
             if let Err(err) = walked {
                 println!("NodeWalker failed with : {}", err);
                 continue;

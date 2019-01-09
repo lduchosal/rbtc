@@ -17,6 +17,7 @@ pub enum Command {
     GetHeaders,
     GetAddr,
     Alert,
+    Addr,
 }
 
 impl FromStr for Command {
@@ -28,6 +29,7 @@ impl FromStr for Command {
             "getaddr" => Ok(Command::GetAddr),
             "verack" => Ok(Command::VerAck),
             "alert" => Ok(Command::Alert),
+            "addr" => Ok(Command::Addr),
             _ => Err(())
         }
     }
@@ -41,6 +43,7 @@ impl ToString for Command {
             Command::GetAddr => "getaddr",
             Command::VerAck => "verack",
             Command::Alert => "alert",
+            Command::Addr => "addr",
         }.to_owned()
     }
 }
