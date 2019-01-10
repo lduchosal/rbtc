@@ -55,8 +55,10 @@ impl NodeWalker {
 
     fn connect(&self) -> Result<TcpStream, NodeWalkerError> {
 
+        println!("Connecting to : {}", &self.addr);
+
         let connect_timeout = std::time::Duration::from_secs(3);
-        let read_timeout = std::time::Duration::from_secs(10);
+        let read_timeout = std::time::Duration::from_secs(30);
         let write_timeout = std::time::Duration::from_secs(5);
 
         let stream = TcpStream::connect_timeout(&self.addr, connect_timeout).map_err(|_| NodeWalkerError::Connect)?;
@@ -137,20 +139,17 @@ impl NodeWalker {
                 Ok(bytes) => read = bytes,
                 Err(err) => {
                     println!("Err: {:?}", err);
-                    match err.kind() {
-                        ErrorKind::WouldBlock => break,
-                        _ => {}
-                    };
+                    break;
                 }
             };
 
             let mut temp = buffer.to_vec();
             temp.truncate(read);
             response.append(&mut temp);
-            if read < buffer.len()
-                && response.len() > 200 {
-                break;
-            }
+            // if read < buffer.len()
+            //     && response.len() > 200 {
+            //     break;
+            // }
         }
 
         let hexcontent2 = hexdump::encode(response.clone());
