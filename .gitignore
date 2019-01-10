@@ -1,3 +1,6 @@
 /target
 **/*.rs.bk
 Cargo.lock
+rbtc_nodewalker.log.201901101440
+rbtc_nodewalker.log.201901101619
+rbtc_nodewalker.log.*

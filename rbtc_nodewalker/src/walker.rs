@@ -131,25 +131,35 @@ impl NodeWalker {
         stream.write(&request).map_err(|_| NodeWalkerError::Write)?;
 
         let mut response : Vec<u8> = Vec::new();
-        let mut buffer = [0u8; 2048];
-
+        let mut buffer = [0u8; 1024];
+        let mut i = 0u32;
         loop {
+            
+
             let mut read : usize = 0;
             match stream.read(&mut buffer) {
                 Ok(bytes) => read = bytes,
                 Err(err) => {
-                    println!("Err: {:?}", err);
+                    println!("Read loop {} Err: {:?}", i, err);
                     break;
                 }
             };
 
+            println!("Read loop {} len {}", i, read);
             let mut temp = buffer.to_vec();
             temp.truncate(read);
+            
+            let temphex = hexdump::encode(temp.clone());
+            println!("{}", temphex);
+            
             response.append(&mut temp);
+
+
             // if read < buffer.len()
             //     && response.len() > 200 {
             //     break;
             // }
+            i = i+1;
         }
 
         let hexcontent2 = hexdump::encode(response.clone());
