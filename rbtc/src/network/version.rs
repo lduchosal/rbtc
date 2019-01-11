@@ -102,7 +102,7 @@ impl Decodable for Service {
         let flag = Service::from_bits(value);
         match flag {
             Some(result) => Ok(result),
-            None => Err(Error::serviceInvalid)
+            None => Err(Error::ServiceInvalid)
         }
     }
 }

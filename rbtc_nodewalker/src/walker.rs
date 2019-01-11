@@ -6,7 +6,6 @@ use rbtc::network::version::Service;
 use rbtc::network::message::Payload;
 use rbtc::network::message::{Message, Magic};
 use rbtc::encode::encode::{Encodable, Decodable};
-
 use rbtc::utils::hexdump;
 
 use rand::Rng;
@@ -15,7 +14,10 @@ use std::net::{TcpStream, IpAddr, SocketAddr};
 use std::io::prelude::*;
 use std::fmt;
 use std::io::{Cursor, Error, ErrorKind};
+use std::sync::mpsc;
+use std::thread;
 
+ 
 #[derive(Debug)]
 pub enum NodeWalkerError {
     Encode,
@@ -94,30 +96,33 @@ impl NodeWalker {
         let verack_getaddr = self.verack_getaddr();
         let addr = self.send(&mut stream, verack_getaddr)?;
 
-        println!("{:?}", addr);
-
         let result = self.parse_addr(addr)?;
         Ok(result)
     }
 
-    fn parse_addr(&self, messages: Vec<Message>) -> Result<Vec<String>, NodeWalkerError> {
+    fn parse_addr(&self, rx: mpsc::Receiver<Vec<Message>>) -> Result<Vec<String>, NodeWalkerError> {
+
         let mut result : Vec<String> = Vec::new();
-        for message in messages {
-            match message.payload {
-                Payload::Addr(addr) => {
-                    for tna in addr.addrs {
-                        let ip_port = format!("{}:{}", tna.addr.ip, tna.addr.port);
-                        result.push(ip_port);
-                    }
-                },
-                _ => {}
-            };
+        while let Ok(messages) = rx.recv() {
+            for message in messages {
+                match message.payload {
+                    Payload::Addr(addr) => {
+                        for tna in addr.addrs {
+                            let ip_port = format!("{}:{}", tna.addr.ip, tna.addr.port);
+                            result.push(ip_port);
+                        }
+                    },
+                    _ => {}
+                };
+            }
         }
 
         Ok(result)
     }
 
-    fn send(&self, stream: &mut TcpStream, messages: Vec<Message>) -> Result<Vec<Message>, NodeWalkerError> {
+    fn send(&self, stream: &mut TcpStream, messages: Vec<Message>) -> Result<mpsc::Receiver<Vec<Message>>, NodeWalkerError> {
+
+        let (tx, rx) = mpsc::channel();
 
         let mut request : Vec<u8> = Vec::new();
         messages.encode(&mut request).map_err(|_| NodeWalkerError::Encode)?;
@@ -128,37 +133,47 @@ impl NodeWalker {
 
         stream.write(&request).map_err(|_| NodeWalkerError::Write)?;
 
-        let mut response : Vec<u8> = Vec::new();
-        let mut buffer = [0u8; 2048];
+        let tx = tx.clone();
+        let receiver_thread = thread::spawn(move || {
 
-        loop {
-            let mut read : usize = 0;
-            match stream.read(&mut buffer) {
-                Ok(bytes) => read = bytes,
-                Err(err) => {
-                    println!("Err: {:?}", err);
-                    match err.kind() {
-                        ErrorKind::WouldBlock => break,
-                        _ => {}
-                    };
+            let mut response : Vec<u8> = Vec::new();
+            let mut buffer = [0u8; 2048];
+
+            loop {
+
+                let mut read : usize = 0;
+                match stream.read(&mut buffer) {
+                    Ok(bytes) => read = bytes,
+                    Err(err) => {
+                        println!("Err: {:?}", err);
+                        match err.kind() {
+                            ErrorKind::WouldBlock => break,
+                            _ => {}
+                        };
+                    }
+                };
+
+                let mut temp = buffer.to_vec();
+                temp.truncate(read);
+                response.append(&mut temp);
+                if read < buffer.len() {
+                    
+                    let hexcontent2 = hexdump::encode(response.clone());
+                    println!("{}", hexcontent2);
+
+                    let mut cursor = Cursor::new(&response);
+                    if let Ok(result) = <Vec<Message>>::decode(&mut cursor) {
+                        response.clear();
+
+                        if let Err(fail) = tx.send(result) {
+                            break;
+                        }
+                    }
                 }
-            };
-
-            let mut temp = buffer.to_vec();
-            temp.truncate(read);
-            response.append(&mut temp);
-            if read < buffer.len()
-                && response.len() > 200 {
-                break;
             }
-        }
+        });
 
-        let hexcontent2 = hexdump::encode(response.clone());
-        println!("{}", hexcontent2);
-
-        let mut cursor = Cursor::new(&response);
-        let result = <Vec<Message>>::decode(&mut cursor).map_err(|_| NodeWalkerError::DecodeMessage)?;
-        Ok(result)
+        Ok(rx)
     }
 
     fn version(&self) -> Vec<Message> {

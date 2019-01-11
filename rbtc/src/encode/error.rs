@@ -89,7 +89,7 @@ pub enum Error {
 
     Service,
     ServiceMatch,
-    serviceInvalid,
+    ServiceInvalid,
 
     IpAddr,
     IpAddrB1,
