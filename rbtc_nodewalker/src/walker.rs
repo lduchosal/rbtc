@@ -57,8 +57,10 @@ impl NodeWalker {
 
     fn connect(&self) -> Result<TcpStream, NodeWalkerError> {
 
+        println!("Connecting to : {}", &self.addr);
+
         let connect_timeout = std::time::Duration::from_secs(3);
-        let read_timeout = std::time::Duration::from_secs(10);
+        let read_timeout = std::time::Duration::from_secs(30);
         let write_timeout = std::time::Duration::from_secs(5);
 
         let stream = TcpStream::connect_timeout(&self.addr, connect_timeout).map_err(|_| NodeWalkerError::Connect)?;
@@ -138,6 +140,7 @@ impl NodeWalker {
 
             let mut response : Vec<u8> = Vec::new();
             let mut buffer = [0u8; 2048];
+            let mut i = 0u32;
 
             loop {
 
@@ -145,13 +148,12 @@ impl NodeWalker {
                 match stream.read(&mut buffer) {
                     Ok(bytes) => read = bytes,
                     Err(err) => {
-                        println!("Err: {:?}", err);
-                        match err.kind() {
-                            ErrorKind::WouldBlock => break,
-                            _ => {}
-                        };
+                        println!("Read loop {} Err: {:?}", i, err);
+                        break;
                     }
                 };
+
+                println!("Read loop {} len {}", i, read);
 
                 let mut temp = buffer.to_vec();
                 temp.truncate(read);

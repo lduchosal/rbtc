@@ -14,6 +14,7 @@ use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 /// When a network address is needed somewhere, this structure is used. 
 /// Network addresses are not prefixed with a timestamp in the version message.
 ///
+/// ```
 /// +------------+-------------+-----------+----------------------------------------------------------------+
 /// | Field Size | Description | Data type | Comments                                                       |
 /// +------------+-------------+-----------+----------------------------------------------------------------+
@@ -31,16 +32,21 @@ use byteorder::{LittleEndian, BigEndian, ReadBytesExt, WriteBytesExt};
 /// +------------+-------------+-----------+----------------------------------------------------------------+
 /// |      2     | port        | uint16_t  | port number, network byte order                                |
 /// +------------+-------------+-----------+----------------------------------------------------------------+
+/// ```
 /// 
 /// Hexdump example of Network address structure
 ///
+/// ```
 /// 0000   01 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  ................
 /// 0010   00 00 FF FF 0A 00 00 01  20 8D                    ........ .
+/// ```
 ///
 /// Network address:
+/// ```
 ///  01 00 00 00 00 00 00 00                         - 1 (NODE_NETWORK: see services listed under version command)
 ///  00 00 00 00 00 00 00 00 00 00 FF FF 0A 00 00 01 - IPv6: ::ffff:a00:1 or IPv4: 10.0.0.1
 ///  20 8D                                           - Port 8333
+/// ```
 /// 
 #[derive(Debug, PartialEq)]
 pub struct NetworkAddr {

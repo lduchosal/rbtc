@@ -160,11 +160,11 @@ impl Decodable for Vec<Message> {
 
         let mut result : Vec<Message> = Vec::new();
         loop {
-            let decode = Message::decode(r);
-            if decode.is_err() {
+            if r.position() as usize == len {
                 break;
             }
-            result.push(decode.unwrap());
+            let decode = Message::decode(r)?;
+            result.push(decode);
         }
 
         if result.len() == 0 {
@@ -230,6 +230,8 @@ impl Decodable for Payload {
         let payload_len = u32::decode(r).map_err(|_| Error::PayloadLen)?;
         let checksum = <[u8; 4]>::decode(r).map_err(|_| Error::PayloadChecksum)?;
 
+        println!("payload_len : {:?}", payload_len);
+
         let mut buffer : Vec<u8> = vec![0u8; payload_len as usize];
         let slice = buffer.as_mut_slice();
         r.read_exact(slice).map_err(|_| Error::MessagePayload)?;
@@ -278,6 +280,7 @@ impl Decodable for Payload {
         Ok(payload)
     }
 }
+
 impl Encodable for Payload {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
@@ -306,7 +309,6 @@ impl Encodable for Payload {
         Ok(())
     }
 }
-
 
 #[cfg(test)]
 mod test {
@@ -344,5 +346,4 @@ mod test {
         assert!(encoded.is_ok());
         assert_eq!(original, result);
     }
-
 }

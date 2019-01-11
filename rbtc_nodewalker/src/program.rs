@@ -61,8 +61,8 @@ impl Program {
 
         let nodes = self.provider.all().unwrap();
         for node in nodes {
-            let src = node.ip;
 
+            let src = node.ip;
             let walker = walker::NodeWalker::new(&src);
             let walked = walker.walk();
             if let Err(err) = walked {

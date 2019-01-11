@@ -101,9 +101,20 @@ impl Decodable for Service {
         let value = u64::decode(r).map_err(|_| Error::Service)?;
         let flag = Service::from_bits(value);
         match flag {
+<<<<<<< HEAD
             Some(result) => Ok(result),
             None => Err(Error::ServiceInvalid)
+=======
+            Some(strict_result) => Ok(strict_result),
+            None => {
+                println!("Service value unknown : {}", value);
+                Ok(Service::from_bits_truncate(value))
+                // strict check ?
+                // Err(Error::serviceInvalid)
+            }
+>>>>>>> 21616ed42ca2238ce8857f7896170ed0c22d297e
         }
+
     }
 }
 

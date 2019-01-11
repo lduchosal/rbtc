@@ -1,3 +1,4 @@
 mod when_getheaders_valid_then_result_ok;
 mod when_connect_getheaders_then_succeed;
 mod when_version_with_0_2_0_then_parse_alert;
+mod when_addr_with_a_lotofdata_then_parse_correctly;
