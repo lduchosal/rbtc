@@ -55,6 +55,7 @@ pub enum Error {
 
     Payload,
     PayloadLen,
+    PayloadTooSmall,
     PayloadChecksum,
     PayloadChecksumData,
     PayloadChecksumInvalid,

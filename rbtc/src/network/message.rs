@@ -228,9 +228,14 @@ impl Decodable for Payload {
 
         let commandstring = CommandString::decode(r).map_err(|_| Error::PayloadCommandString)?;
         let payload_len = u32::decode(r).map_err(|_| Error::PayloadLen)?;
-        let checksum = <[u8; 4]>::decode(r).map_err(|_| Error::PayloadChecksum)?;
+        let reader_len = r.get_ref().len();
+        
+        println!("Payload.decode [payload_len : {:?}, reraderlen : {}]", payload_len, reader_len);
+        if reader_len < payload_len as usize {
+            return Err(Error::PayloadTooSmall);
+        }
 
-        println!("payload_len : {:?}", payload_len);
+        let checksum = <[u8; 4]>::decode(r).map_err(|_| Error::PayloadChecksum)?;
 
         let mut buffer : Vec<u8> = vec![0u8; payload_len as usize];
         let slice = buffer.as_mut_slice();

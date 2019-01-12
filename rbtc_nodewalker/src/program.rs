@@ -22,12 +22,18 @@ impl Program {
     }
 
     pub fn run(&self) {
-        self.seed();
-        self.report();
-        self.walk();
 
-        let ten_sec = time::Duration::from_secs(10);
-        thread::sleep(ten_sec);
+        loop {
+
+            self.report();
+            self.seed();
+            self.report();
+            self.walk();
+            self.report();
+
+            let ten_sec = time::Duration::from_secs(10);
+            thread::sleep(ten_sec);
+        }
     }
 
     fn seed(&self) {
@@ -46,9 +52,10 @@ impl Program {
     fn report(&self) {
 
         let nodes = self.provider.all().unwrap();
-        for node in nodes {
-            println!("{} {} {}", node.id, node.src, node.ip);
-        }
+        // for node in nodes {
+        //     println!("{} {} {}", node.id, node.src, node.ip);
+        // }
+        println!("Node capture : {}", nodes.len());
 
         let now = chrono::Local::now();
         println!("------------------------------", );
@@ -63,14 +70,23 @@ impl Program {
         for node in nodes {
 
             let src = node.ip;
-            let walker = walker::NodeWalker::new(&src);
-            let walked = walker.walk();
+            let walker_result = walker::NodeWalker::new(&src);
+
+            if let Err(err) = walker_result {
+                println!("NodeWalker new {} failed with : {}", src, err);
+                println!("NodeWalker new failed with : {}", err);
+                continue;
+            }
+
+            let walked = walker_result.unwrap().walk();
+            
             if let Err(err) = walked {
                 println!("NodeWalker failed with : {}", err);
                 continue;
             }
 
             let ips = walked.unwrap();
+            println!("NodeWalker got {} new ips from {}", ips.len(), src);
             let inserted = self.provider.bulkinsert(ips, &src);
 
             if let Err(err) = inserted {
