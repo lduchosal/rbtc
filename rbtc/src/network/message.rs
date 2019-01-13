@@ -239,7 +239,7 @@ impl Decodable for Payload {
 
         let mut buffer : Vec<u8> = vec![0u8; payload_len as usize];
         let slice = buffer.as_mut_slice();
-        r.read_exact(slice).map_err(|_| Error::MessagePayload)?;
+        r.read_exact(slice).map_err(|_| Error::PayloadData)?;
 
         let checksum2 : [u8; 4] = Message::checksum(&buffer).map_err(|_| Error::PayloadChecksumData)?;
         if checksum2 != checksum {
@@ -309,7 +309,7 @@ impl Encodable for Payload {
 
         let checksum = Message::checksum(&buffer).map_err(|_| Error::PayloadChecksum)?;
         checksum.encode(w).map_err(|_| Error::PayloadChecksum)?;
-        buffer.encode(w).map_err(|_| Error::MessagePayload)?;
+        buffer.encode(w).map_err(|_| Error::PayloadData)?;
 
         Ok(())
     }

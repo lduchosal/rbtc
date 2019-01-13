@@ -1,0 +1,2521 @@
+#![feature(prelude_import)]
+#![no_std]
+#[prelude_import]
+use ::std::prelude::v1::*;
+#[macro_use]
+extern crate std as std;
+extern crate chrono;
+
+pub mod config {
+
+
+
+
+
+
+    use std::path::Path;
+    pub struct Config {
+        pub dns_seeds: Vec<String>,
+        pub sqlite_path: &'static Path,
+    }
+}
+pub mod resolver {
+    use dns_lookup::{lookup_host};
+    use std::net::IpAddr;
+    use std::collections::HashSet;
+    pub struct Resolver {
+        dns_seeds: Vec<String>,
+    }
+    impl Resolver {
+        pub fn new(dns_seeds: Vec<String>) -> Resolver {
+            Resolver{dns_seeds: dns_seeds,}
+        }
+        pub fn ips(&self) -> HashSet<IpAddr> {
+            let mut result: HashSet<IpAddr> = HashSet::new();
+            let dns_seeds = &self.dns_seeds;
+            for seed in dns_seeds {
+                let oips = lookup_host(&seed);
+                if let Ok(ips) = oips { for ip in ips { result.insert(ip); } }
+            }
+            result
+        }
+    }
+}
+pub mod provider {
+    extern crate rusqlite;
+    use crate::node::Node;
+    use std::path::Path;
+    use std::fmt;
+    use rusqlite::types::ToSql;
+    use rusqlite::{Connection, NO_PARAMS};
+    pub enum ProviderError {
+        New,
+        Init,
+        Insert,
+        InsertIterator,
+        Select,
+        SelectIterator,
+    }
+    #[automatically_derived]
+    #[allow(unused_qualifications)]
+    impl $crate::fmt::Debug for ProviderError {
+        fn fmt(&self, f: &mut $crate::fmt::Formatter) -> $crate::fmt::Result {
+            match (&*self,) {
+                (&ProviderError::New,) => {
+                    let mut debug_trait_builder = f.debug_tuple("New");
+                    debug_trait_builder.finish()
+                }
+                (&ProviderError::Init,) => {
+                    let mut debug_trait_builder = f.debug_tuple("Init");
+                    debug_trait_builder.finish()
+                }
+                (&ProviderError::Insert,) => {
+                    let mut debug_trait_builder = f.debug_tuple("Insert");
+                    debug_trait_builder.finish()
+                }
+                (&ProviderError::InsertIterator,) => {
+                    let mut debug_trait_builder =
+                        f.debug_tuple("InsertIterator");
+                    debug_trait_builder.finish()
+                }
+                (&ProviderError::Select,) => {
+                    let mut debug_trait_builder = f.debug_tuple("Select");
+                    debug_trait_builder.finish()
+                }
+                (&ProviderError::SelectIterator,) => {
+                    let mut debug_trait_builder =
+                        f.debug_tuple("SelectIterator");
+                    debug_trait_builder.finish()
+                }
+            }
+        }
+    }
+    impl fmt::Display for ProviderError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            f.write_fmt($crate::fmt::Arguments::new_v1_formatted(&[""],
+                                                                 &match (&self,)
+                                                                      {
+                                                                      (arg0,)
+                                                                      =>
+                                                                      [$crate::fmt::ArgumentV1::new(arg0,
+                                                                                                    $crate::fmt::Debug::fmt)],
+                                                                  },
+                                                                 &[$crate::fmt::rt::v1::Argument{position:
+                                                                                                     $crate::fmt::rt::v1::Position::At(0usize),
+                                                                                                 format:
+                                                                                                     $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                         ' ',
+                                                                                                                                     align:
+                                                                                                                                         $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                     flags:
+                                                                                                                                         0u32,
+                                                                                                                                     precision:
+                                                                                                                                         $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                     width:
+                                                                                                                                         $crate::fmt::rt::v1::Count::Implied,},}]))
+        }
+    }
+    pub struct NodeProvider {
+        conn: Connection,
+    }
+    impl NodeProvider {
+        pub fn new(path: &Path) -> Result<NodeProvider, ProviderError> {
+            let conn = Connection::open(path).unwrap();
+            let provider = NodeProvider{conn: conn,};
+            provider.init().map_err(|_| ProviderError::New)?;
+            Ok(provider)
+        }
+        fn init(&self) -> Result<usize, ProviderError> {
+            self.conn.execute("\n            CREATE TABLE IF NOT EXISTS node (\n                id  INTEGER PRIMARY KEY,\n                ip  VARCHAR(64) UNIQUE NOT NULL,\n                src VARCHAR(64) NOT NULL,\n                creation DATETIME NOT NULL\n            )\n        ",
+                              NO_PARAMS).map_err(|_| ProviderError::Init)
+        }
+        pub fn insert(&self, n: &Node) -> Result<usize, ProviderError> {
+            self.conn.execute("INSERT OR IGNORE INTO node (ip, src, creation) VALUES (?1, ?2, ?3)",
+                              &[&n.ip as &ToSql, &n.src as &ToSql,
+                                &n.creation]).map_err(|_|
+                                                          ProviderError::Insert)
+        }
+        pub fn bulkinsert(&self, ips: Vec<String>, src: &String)
+         -> Result<(), ProviderError> {
+            let now = chrono::Local::now();
+            for ip in ips {
+                let node =
+                    Node{id: 0,
+                         ip: ip,
+                         src: src.clone(),
+                         creation: now.timestamp(),};
+                self.insert(&node).map_err(|_|
+                                               ProviderError::InsertIterator)?;
+            }
+            Ok(())
+        }
+        pub fn all(&self) -> Result<Vec<Node>, ProviderError> {
+            let mut stmt =
+                self.conn.prepare("\n            SELECT id, ip, src, creation \n              FROM node\n              ;\n              ").unwrap();
+            let iter =
+                stmt.query_map(NO_PARAMS,
+                               |row|
+                                   Node{id: row.get(0),
+                                        ip: row.get(1),
+                                        src: row.get(2),
+                                        creation:
+                                            row.get(3),}).map_err(|_|
+                                                                      ProviderError::Select)?;
+            let mut result: Vec<Node> = Vec::new();
+            for item in iter {
+                let node = item.map_err(|_| ProviderError::SelectIterator)?;
+                result.push(node);
+            }
+            Ok(result)
+        }
+    }
+}
+pub mod node {
+    pub struct Node {
+        pub id: i32,
+        pub ip: String,
+        pub src: String,
+        pub creation: i64,
+    }
+    #[automatically_derived]
+    #[allow(unused_qualifications)]
+    impl $crate::fmt::Debug for Node {
+        fn fmt(&self, f: &mut $crate::fmt::Formatter) -> $crate::fmt::Result {
+            match *self {
+                Node {
+                id: ref __self_0_0,
+                ip: ref __self_0_1,
+                src: ref __self_0_2,
+                creation: ref __self_0_3 } => {
+                    let mut debug_trait_builder = f.debug_struct("Node");
+                    let _ = debug_trait_builder.field("id", &&(*__self_0_0));
+                    let _ = debug_trait_builder.field("ip", &&(*__self_0_1));
+                    let _ = debug_trait_builder.field("src", &&(*__self_0_2));
+                    let _ =
+                        debug_trait_builder.field("creation",
+                                                  &&(*__self_0_3));
+                    debug_trait_builder.finish()
+                }
+            }
+        }
+    }
+}
+pub mod walker {
+    use rbtc::network::networkaddr::NetworkAddr;
+    use rbtc::network::version::Version;
+    use rbtc::network::verack::VerAck;
+    use rbtc::network::getaddr::GetAddr;
+    use rbtc::network::version::Service;
+    use rbtc::network::message::Payload;
+    use rbtc::network::message::{Message, Magic};
+    use rbtc::encode::encode::{Encodable, Decodable};
+    use rbtc::encode::error::Error;
+    use rbtc::utils::hexdump;
+    use rand::Rng;
+    use std::net::{TcpStream, IpAddr, SocketAddr};
+    use std::io::prelude::*;
+    use std::fmt;
+    use std::io::{Cursor, ErrorKind};
+    pub enum NodeWalkerError {
+        Encode,
+        Connect,
+        ReadTimeout,
+        Read,
+        Write,
+        WriteTimeout,
+        Shutdown,
+        DecodeMessage,
+        ParseAddrFail,
+    }
+    #[automatically_derived]
+    #[allow(unused_qualifications)]
+    impl $crate::fmt::Debug for NodeWalkerError {
+        fn fmt(&self, f: &mut $crate::fmt::Formatter) -> $crate::fmt::Result {
+            match (&*self,) {
+                (&NodeWalkerError::Encode,) => {
+                    let mut debug_trait_builder = f.debug_tuple("Encode");
+                    debug_trait_builder.finish()
+                }
+                (&NodeWalkerError::Connect,) => {
+                    let mut debug_trait_builder = f.debug_tuple("Connect");
+                    debug_trait_builder.finish()
+                }
+                (&NodeWalkerError::ReadTimeout,) => {
+                    let mut debug_trait_builder =
+                        f.debug_tuple("ReadTimeout");
+                    debug_trait_builder.finish()
+                }
+                (&NodeWalkerError::Read,) => {
+                    let mut debug_trait_builder = f.debug_tuple("Read");
+                    debug_trait_builder.finish()
+                }
+                (&NodeWalkerError::Write,) => {
+                    let mut debug_trait_builder = f.debug_tuple("Write");
+                    debug_trait_builder.finish()
+                }
+                (&NodeWalkerError::WriteTimeout,) => {
+                    let mut debug_trait_builder =
+                        f.debug_tuple("WriteTimeout");
+                    debug_trait_builder.finish()
+                }
+                (&NodeWalkerError::Shutdown,) => {
+                    let mut debug_trait_builder = f.debug_tuple("Shutdown");
+                    debug_trait_builder.finish()
+                }
+                (&NodeWalkerError::DecodeMessage,) => {
+                    let mut debug_trait_builder =
+                        f.debug_tuple("DecodeMessage");
+                    debug_trait_builder.finish()
+                }
+                (&NodeWalkerError::ParseAddrFail,) => {
+                    let mut debug_trait_builder =
+                        f.debug_tuple("ParseAddrFail");
+                    debug_trait_builder.finish()
+                }
+            }
+        }
+    }
+    impl fmt::Display for NodeWalkerError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            f.write_fmt($crate::fmt::Arguments::new_v1_formatted(&[""],
+                                                                 &match (&self,)
+                                                                      {
+                                                                      (arg0,)
+                                                                      =>
+                                                                      [$crate::fmt::ArgumentV1::new(arg0,
+                                                                                                    $crate::fmt::Debug::fmt)],
+                                                                  },
+                                                                 &[$crate::fmt::rt::v1::Argument{position:
+                                                                                                     $crate::fmt::rt::v1::Position::At(0usize),
+                                                                                                 format:
+                                                                                                     $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                         ' ',
+                                                                                                                                     align:
+                                                                                                                                         $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                     flags:
+                                                                                                                                         0u32,
+                                                                                                                                     precision:
+                                                                                                                                         $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                     width:
+                                                                                                                                         $crate::fmt::rt::v1::Count::Implied,},}]))
+        }
+    }
+    pub struct NodeWalker {
+        addr: SocketAddr,
+    }
+    impl NodeWalker {
+        pub fn new(nodeip: &String) -> Result<NodeWalker, NodeWalkerError> {
+            let mut node_ip_port = nodeip.clone();
+            if !nodeip.ends_with(":8333") { node_ip_port.push_str(":8333"); }
+            let addr: SocketAddr =
+                node_ip_port.parse().map_err(|_|
+                                                 NodeWalkerError::ParseAddrFail)?;
+            let result = NodeWalker{addr: addr,};
+            Ok(result)
+        }
+        fn connect(&self) -> Result<TcpStream, NodeWalkerError> {
+            {
+                $crate::io::_print($crate::fmt::Arguments::new_v1_formatted(&["Connecting to : ",
+                                                                              "\n"],
+                                                                            &match (&&self.addr,)
+                                                                                 {
+                                                                                 (arg0,)
+                                                                                 =>
+                                                                                 [$crate::fmt::ArgumentV1::new(arg0,
+                                                                                                               $crate::fmt::Display::fmt)],
+                                                                             },
+                                                                            &[$crate::fmt::rt::v1::Argument{position:
+                                                                                                                $crate::fmt::rt::v1::Position::At(0usize),
+                                                                                                            format:
+                                                                                                                $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                                    ' ',
+                                                                                                                                                align:
+                                                                                                                                                    $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                                flags:
+                                                                                                                                                    0u32,
+                                                                                                                                                precision:
+                                                                                                                                                    $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                                width:
+                                                                                                                                                    $crate::fmt::rt::v1::Count::Implied,},}]));
+            };
+            let connect_timeout = std::time::Duration::from_secs(3);
+            let read_timeout = std::time::Duration::from_secs(30);
+            let write_timeout = std::time::Duration::from_secs(5);
+            let stream =
+                TcpStream::connect_timeout(&self.addr,
+                                           connect_timeout).map_err(|_|
+                                                                        NodeWalkerError::Connect)?;
+            stream.set_read_timeout(Option::Some(read_timeout)).map_err(|_|
+                                                                            NodeWalkerError::ReadTimeout)?;
+            stream.set_write_timeout(Option::Some(write_timeout)).map_err(|_|
+                                                                              NodeWalkerError::WriteTimeout)?;
+            Ok(stream)
+        }
+        /// 
+        /// https://en.itcoin.it/wiki/Version_Handshake
+        /// 
+        /// On connect, version and verack messages are exchanged, in order to ensure compatibility between peers.
+        /// 
+        /// Version Handshake
+        /// When the local peer (L) connects to a remote peer (R), the remote peer will not send any data until it receives a version message.
+        /// 
+        /// L -> R: Send version message with the local peer's version
+        /// R -> L: Send version message back
+        /// R -> L: Send verack message
+        /// R:      Sets version to the minimum of the 2 versions
+        /// L -> R: Send verack message after receiving version message from R
+        /// L:      Sets version to the minimum of the 2 versions
+        /// 
+        /// Note: Versions below 31800 are no longer supported.
+        /// 
+        pub fn walk(&self) -> Result<Vec<String>, NodeWalkerError> {
+            let mut stream = self.connect()?;
+            let version = self.version();
+            let _verack = self.send(&mut stream, version)?;
+            let verack_getaddr = self.verack_getaddr();
+            let addr = self.send(&mut stream, verack_getaddr)?;
+            let result = self.parse_addr(addr)?;
+            Ok(result)
+        }
+        fn parse_addr(&self, messages: Vec<Message>)
+         -> Result<Vec<String>, NodeWalkerError> {
+            let mut result: Vec<String> = Vec::new();
+            for message in messages {
+                match message.payload {
+                    Payload::Addr(addr) => {
+                        for tna in addr.addrs {
+                            let ip_port =
+                                $crate::fmt::format($crate::fmt::Arguments::new_v1_formatted(&["",
+                                                                                               ":"],
+                                                                                             &match (&tna.addr.ip,
+                                                                                                     &tna.addr.port)
+                                                                                                  {
+                                                                                                  (arg0,
+                                                                                                   arg1)
+                                                                                                  =>
+                                                                                                  [$crate::fmt::ArgumentV1::new(arg0,
+                                                                                                                                $crate::fmt::Display::fmt),
+                                                                                                   $crate::fmt::ArgumentV1::new(arg1,
+                                                                                                                                $crate::fmt::Display::fmt)],
+                                                                                              },
+                                                                                             &[$crate::fmt::rt::v1::Argument{position:
+                                                                                                                                 $crate::fmt::rt::v1::Position::At(0usize),
+                                                                                                                             format:
+                                                                                                                                 $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                                                     ' ',
+                                                                                                                                                                 align:
+                                                                                                                                                                     $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                                                 flags:
+                                                                                                                                                                     0u32,
+                                                                                                                                                                 precision:
+                                                                                                                                                                     $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                                                 width:
+                                                                                                                                                                     $crate::fmt::rt::v1::Count::Implied,},},
+                                                                                               $crate::fmt::rt::v1::Argument{position:
+                                                                                                                                 $crate::fmt::rt::v1::Position::At(1usize),
+                                                                                                                             format:
+                                                                                                                                 $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                                                     ' ',
+                                                                                                                                                                 align:
+                                                                                                                                                                     $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                                                 flags:
+                                                                                                                                                                     0u32,
+                                                                                                                                                                 precision:
+                                                                                                                                                                     $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                                                 width:
+                                                                                                                                                                     $crate::fmt::rt::v1::Count::Implied,},}]));
+                            result.push(ip_port);
+                        }
+                    }
+                    _ => { }
+                };
+            }
+            Ok(result)
+        }
+        fn send(&self, stream: &mut TcpStream, messages: Vec<Message>)
+         -> Result<Vec<Message>, NodeWalkerError> {
+            let mut request: Vec<u8> = Vec::new();
+            messages.encode(&mut request).map_err(|_|
+                                                      NodeWalkerError::Encode)?;
+            stream.write(&request).map_err(|_| NodeWalkerError::Write)?;
+            let mut response: Vec<u8> = Vec::new();
+            let mut buffer = [0u8; 8192];
+            let mut i = 0u32;
+            let mut read: usize = 0;
+            let mut result: Vec<Message> = Vec::new();
+            loop  {
+                i = i + 1;
+                match stream.read(&mut buffer) {
+                    Ok(bytes) => read = bytes,
+                    Err(err) => {
+                        {
+                            $crate::io::_print($crate::fmt::Arguments::new_v1_formatted(&["Read loop Err: ",
+                                                                                          "\n"],
+                                                                                        &match (&err,)
+                                                                                             {
+                                                                                             (arg0,)
+                                                                                             =>
+                                                                                             [$crate::fmt::ArgumentV1::new(arg0,
+                                                                                                                           $crate::fmt::Debug::fmt)],
+                                                                                         },
+                                                                                        &[$crate::fmt::rt::v1::Argument{position:
+                                                                                                                            $crate::fmt::rt::v1::Position::At(0usize),
+                                                                                                                        format:
+                                                                                                                            $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                                                ' ',
+                                                                                                                                                            align:
+                                                                                                                                                                $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                                            flags:
+                                                                                                                                                                0u32,
+                                                                                                                                                            precision:
+                                                                                                                                                                $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                                            width:
+                                                                                                                                                                $crate::fmt::rt::v1::Count::Implied,},}]));
+                        };
+                        break ;
+                    }
+                };
+                {
+                    $crate::io::_print($crate::fmt::Arguments::new_v1_formatted(&["Read loop ",
+                                                                                  " len ",
+                                                                                  "\n"],
+                                                                                &match (&i,
+                                                                                        &read)
+                                                                                     {
+                                                                                     (arg0,
+                                                                                      arg1)
+                                                                                     =>
+                                                                                     [$crate::fmt::ArgumentV1::new(arg0,
+                                                                                                                   $crate::fmt::Display::fmt),
+                                                                                      $crate::fmt::ArgumentV1::new(arg1,
+                                                                                                                   $crate::fmt::Display::fmt)],
+                                                                                 },
+                                                                                &[$crate::fmt::rt::v1::Argument{position:
+                                                                                                                    $crate::fmt::rt::v1::Position::At(0usize),
+                                                                                                                format:
+                                                                                                                    $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                                        ' ',
+                                                                                                                                                    align:
+                                                                                                                                                        $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                                    flags:
+                                                                                                                                                        0u32,
+                                                                                                                                                    precision:
+                                                                                                                                                        $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                                    width:
+                                                                                                                                                        $crate::fmt::rt::v1::Count::Implied,},},
+                                                                                  $crate::fmt::rt::v1::Argument{position:
+                                                                                                                    $crate::fmt::rt::v1::Position::At(1usize),
+                                                                                                                format:
+                                                                                                                    $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                                        ' ',
+                                                                                                                                                    align:
+                                                                                                                                                        $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                                    flags:
+                                                                                                                                                        0u32,
+                                                                                                                                                    precision:
+                                                                                                                                                        $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                                    width:
+                                                                                                                                                        $crate::fmt::rt::v1::Count::Implied,},}]));
+                };
+                if read == 0 {
+                    {
+                        $crate::io::_print($crate::fmt::Arguments::new_v1(&["Read loop, len0, leaving\n"],
+                                                                          &match ()
+                                                                               {
+                                                                               ()
+                                                                               =>
+                                                                               [],
+                                                                           }));
+                    };
+                    break ;
+                }
+                let mut temp = buffer.to_vec();
+                temp.truncate(read);
+                response.append(&mut temp);
+                if read == buffer.len() {
+                    {
+                        $crate::io::_print($crate::fmt::Arguments::new_v1(&["Read loop, lenmax, continue\n"],
+                                                                          &match ()
+                                                                               {
+                                                                               ()
+                                                                               =>
+                                                                               [],
+                                                                           }));
+                    };
+                    continue ;
+                }
+                if read < buffer.len() {
+                    let mut cursor = Cursor::new(&response);
+                    let decode_result = <Vec<Message>>::decode(&mut cursor);
+                    match decode_result {
+                        Err(err) => {
+                            {
+                                $crate::io::_print($crate::fmt::Arguments::new_v1_formatted(&["Read loop, decode error ",
+                                                                                              "\n"],
+                                                                                            &match (&err,)
+                                                                                                 {
+                                                                                                 (arg0,)
+                                                                                                 =>
+                                                                                                 [$crate::fmt::ArgumentV1::new(arg0,
+                                                                                                                               $crate::fmt::Debug::fmt)],
+                                                                                             },
+                                                                                            &[$crate::fmt::rt::v1::Argument{position:
+                                                                                                                                $crate::fmt::rt::v1::Position::At(0usize),
+                                                                                                                            format:
+                                                                                                                                $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                                                    ' ',
+                                                                                                                                                                align:
+                                                                                                                                                                    $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                                                flags:
+                                                                                                                                                                    0u32,
+                                                                                                                                                                precision:
+                                                                                                                                                                    $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                                                width:
+                                                                                                                                                                    $crate::fmt::rt::v1::Count::Implied,},}]));
+                            };
+                            match err {
+                                Error::PayloadData => {
+                                    {
+                                        $crate::io::_print($crate::fmt::Arguments::new_v1(&["Read loop, decode error, try again\n"],
+                                                                                          &match ()
+                                                                                               {
+                                                                                               ()
+                                                                                               =>
+                                                                                               [],
+                                                                                           }));
+                                    };
+                                    continue ;
+                                }
+                                Error::PayloadLen => {
+                                    {
+                                        $crate::io::_print($crate::fmt::Arguments::new_v1(&["Read loop, decode error, try again\n"],
+                                                                                          &match ()
+                                                                                               {
+                                                                                               ()
+                                                                                               =>
+                                                                                               [],
+                                                                                           }));
+                                    };
+                                    continue ;
+                                }
+                                _ => {
+                                    {
+                                        $crate::io::_print($crate::fmt::Arguments::new_v1(&["Read loop, unknown error, abandon\n"],
+                                                                                          &match ()
+                                                                                               {
+                                                                                               ()
+                                                                                               =>
+                                                                                               [],
+                                                                                           }));
+                                    };
+                                    break ;
+                                }
+                            }
+                        }
+                        Ok(mut messages) => {
+                            {
+                                $crate::io::_print($crate::fmt::Arguments::new_v1(&["Read loop, decode suceed, leaving\n"],
+                                                                                  &match ()
+                                                                                       {
+                                                                                       ()
+                                                                                       =>
+                                                                                       [],
+                                                                                   }));
+                            };
+                            result.append(&mut messages);
+                            response.clear();
+                            break ;
+                        }
+                    }
+                }
+            }
+            Ok(result)
+        }
+        fn version(&self) -> Vec<Message> {
+            let now = chrono::Local::now();
+            let mut rng = rand::thread_rng();
+            let nonce: u64 = rng.gen();
+            let version =
+                Version{version: 70002,
+                        services: Service::Network,
+                        timestamp: now.timestamp(),
+                        receiver:
+                            NetworkAddr{services: Service::Network,
+                                        ip:
+                                            IpAddr::V4("0.0.0.0".parse().unwrap()),
+                                        port: 0,},
+                        sender:
+                            NetworkAddr{services: Service::Network,
+                                        ip:
+                                            IpAddr::V4("0.0.0.0".parse().unwrap()),
+                                        port: 0,},
+                        nonce: nonce,
+                        user_agent: "/rbtc:0.17.0.1/".to_string(),
+                        start_height: 557409,
+                        relay: false,};
+            let version = Payload::Version(version);
+            <[_]>::into_vec(box
+                                [Message{magic: Magic::MainNet,
+                                         payload: version,}])
+        }
+        fn verack_getaddr(&self) -> Vec<Message> {
+            let now = chrono::Local::now();
+            let mut rng = rand::thread_rng();
+            let nonce: u64 = rng.gen();
+            let verack = Payload::VerAck(VerAck{});
+            let getaddr = Payload::GetAddr(GetAddr{});
+            <[_]>::into_vec(box
+                                [Message{magic: Magic::MainNet,
+                                         payload: verack,},
+                                 Message{magic: Magic::MainNet,
+                                         payload: getaddr,}])
+        }
+    }
+}
+pub mod program {
+    use crate::resolver;
+    use crate::provider;
+    use crate::walker;
+    use std::{thread, time};
+    pub struct Program {
+        resolver: resolver::Resolver,
+        provider: provider::NodeProvider,
+    }
+    impl Program {
+        pub fn new(resolver: resolver::Resolver,
+                   provider: provider::NodeProvider) -> Program {
+            Program{resolver: resolver, provider: provider,}
+        }
+        pub fn run(&self) {
+            loop  {
+                self.report();
+                self.seed();
+                self.report();
+                self.walk();
+                self.report();
+                let ten_sec = time::Duration::from_secs(10);
+                thread::sleep(ten_sec);
+            }
+        }
+        fn seed(&self) {
+            let ips =
+                self.resolver.ips().into_iter().map(|ip|
+                                                        ip.to_string()).collect();
+            let src = String::from("dnsseed");
+            self.provider.bulkinsert(ips, &src).unwrap();
+        }
+        fn report(&self) {
+            let nodes = self.provider.all().unwrap();
+            {
+                $crate::io::_print($crate::fmt::Arguments::new_v1_formatted(&["Node capture : ",
+                                                                              "\n"],
+                                                                            &match (&nodes.len(),)
+                                                                                 {
+                                                                                 (arg0,)
+                                                                                 =>
+                                                                                 [$crate::fmt::ArgumentV1::new(arg0,
+                                                                                                               $crate::fmt::Display::fmt)],
+                                                                             },
+                                                                            &[$crate::fmt::rt::v1::Argument{position:
+                                                                                                                $crate::fmt::rt::v1::Position::At(0usize),
+                                                                                                            format:
+                                                                                                                $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                                    ' ',
+                                                                                                                                                align:
+                                                                                                                                                    $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                                flags:
+                                                                                                                                                    0u32,
+                                                                                                                                                precision:
+                                                                                                                                                    $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                                width:
+                                                                                                                                                    $crate::fmt::rt::v1::Count::Implied,},}]));
+            };
+            let now = chrono::Local::now();
+            {
+                $crate::io::_print($crate::fmt::Arguments::new_v1(&["------------------------------\n"],
+                                                                  &match () {
+                                                                       () =>
+                                                                       [],
+                                                                   }));
+            };
+            {
+                $crate::io::_print($crate::fmt::Arguments::new_v1_formatted(&["",
+                                                                              "\n"],
+                                                                            &match (&now.to_string(),)
+                                                                                 {
+                                                                                 (arg0,)
+                                                                                 =>
+                                                                                 [$crate::fmt::ArgumentV1::new(arg0,
+                                                                                                               $crate::fmt::Display::fmt)],
+                                                                             },
+                                                                            &[$crate::fmt::rt::v1::Argument{position:
+                                                                                                                $crate::fmt::rt::v1::Position::At(0usize),
+                                                                                                            format:
+                                                                                                                $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                                    ' ',
+                                                                                                                                                align:
+                                                                                                                                                    $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                                flags:
+                                                                                                                                                    0u32,
+                                                                                                                                                precision:
+                                                                                                                                                    $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                                width:
+                                                                                                                                                    $crate::fmt::rt::v1::Count::Implied,},}]));
+            };
+            {
+                $crate::io::_print($crate::fmt::Arguments::new_v1(&["------------------------------\n"],
+                                                                  &match () {
+                                                                       () =>
+                                                                       [],
+                                                                   }));
+            };
+        }
+        fn walk(&self) {
+            let nodes = self.provider.all().unwrap();
+            for node in nodes {
+                let src = node.ip;
+                let walker_result = walker::NodeWalker::new(&src);
+                if let Err(err) = walker_result {
+                    {
+                        $crate::io::_print($crate::fmt::Arguments::new_v1_formatted(&["NodeWalker new ",
+                                                                                      " failed with : ",
+                                                                                      "\n"],
+                                                                                    &match (&src,
+                                                                                            &err)
+                                                                                         {
+                                                                                         (arg0,
+                                                                                          arg1)
+                                                                                         =>
+                                                                                         [$crate::fmt::ArgumentV1::new(arg0,
+                                                                                                                       $crate::fmt::Display::fmt),
+                                                                                          $crate::fmt::ArgumentV1::new(arg1,
+                                                                                                                       $crate::fmt::Display::fmt)],
+                                                                                     },
+                                                                                    &[$crate::fmt::rt::v1::Argument{position:
+                                                                                                                        $crate::fmt::rt::v1::Position::At(0usize),
+                                                                                                                    format:
+                                                                                                                        $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                                            ' ',
+                                                                                                                                                        align:
+                                                                                                                                                            $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                                        flags:
+                                                                                                                                                            0u32,
+                                                                                                                                                        precision:
+                                                                                                                                                            $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                                        width:
+                                                                                                                                                            $crate::fmt::rt::v1::Count::Implied,},},
+                                                                                      $crate::fmt::rt::v1::Argument{position:
+                                                                                                                        $crate::fmt::rt::v1::Position::At(1usize),
+                                                                                                                    format:
+                                                                                                                        $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                                            ' ',
+                                                                                                                                                        align:
+                                                                                                                                                            $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                                        flags:
+                                                                                                                                                            0u32,
+                                                                                                                                                        precision:
+                                                                                                                                                            $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                                        width:
+                                                                                                                                                            $crate::fmt::rt::v1::Count::Implied,},}]));
+                    };
+                    {
+                        $crate::io::_print($crate::fmt::Arguments::new_v1_formatted(&["NodeWalker new failed with : ",
+                                                                                      "\n"],
+                                                                                    &match (&err,)
+                                                                                         {
+                                                                                         (arg0,)
+                                                                                         =>
+                                                                                         [$crate::fmt::ArgumentV1::new(arg0,
+                                                                                                                       $crate::fmt::Display::fmt)],
+                                                                                     },
+                                                                                    &[$crate::fmt::rt::v1::Argument{position:
+                                                                                                                        $crate::fmt::rt::v1::Position::At(0usize),
+                                                                                                                    format:
+                                                                                                                        $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                                            ' ',
+                                                                                                                                                        align:
+                                                                                                                                                            $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                                        flags:
+                                                                                                                                                            0u32,
+                                                                                                                                                        precision:
+                                                                                                                                                            $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                                        width:
+                                                                                                                                                            $crate::fmt::rt::v1::Count::Implied,},}]));
+                    };
+                    continue ;
+                }
+                let walked = walker_result.unwrap().walk();
+                if let Err(err) = walked {
+                    {
+                        $crate::io::_print($crate::fmt::Arguments::new_v1_formatted(&["NodeWalker failed with : ",
+                                                                                      "\n"],
+                                                                                    &match (&err,)
+                                                                                         {
+                                                                                         (arg0,)
+                                                                                         =>
+                                                                                         [$crate::fmt::ArgumentV1::new(arg0,
+                                                                                                                       $crate::fmt::Display::fmt)],
+                                                                                     },
+                                                                                    &[$crate::fmt::rt::v1::Argument{position:
+                                                                                                                        $crate::fmt::rt::v1::Position::At(0usize),
+                                                                                                                    format:
+                                                                                                                        $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                                            ' ',
+                                                                                                                                                        align:
+                                                                                                                                                            $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                                        flags:
+                                                                                                                                                            0u32,
+                                                                                                                                                        precision:
+                                                                                                                                                            $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                                        width:
+                                                                                                                                                            $crate::fmt::rt::v1::Count::Implied,},}]));
+                    };
+                    continue ;
+                }
+                let ips = walked.unwrap();
+                {
+                    $crate::io::_print($crate::fmt::Arguments::new_v1_formatted(&["NodeWalker got ",
+                                                                                  " new ips from ",
+                                                                                  "\n"],
+                                                                                &match (&ips.len(),
+                                                                                        &src)
+                                                                                     {
+                                                                                     (arg0,
+                                                                                      arg1)
+                                                                                     =>
+                                                                                     [$crate::fmt::ArgumentV1::new(arg0,
+                                                                                                                   $crate::fmt::Display::fmt),
+                                                                                      $crate::fmt::ArgumentV1::new(arg1,
+                                                                                                                   $crate::fmt::Display::fmt)],
+                                                                                 },
+                                                                                &[$crate::fmt::rt::v1::Argument{position:
+                                                                                                                    $crate::fmt::rt::v1::Position::At(0usize),
+                                                                                                                format:
+                                                                                                                    $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                                        ' ',
+                                                                                                                                                    align:
+                                                                                                                                                        $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                                    flags:
+                                                                                                                                                        0u32,
+                                                                                                                                                    precision:
+                                                                                                                                                        $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                                    width:
+                                                                                                                                                        $crate::fmt::rt::v1::Count::Implied,},},
+                                                                                  $crate::fmt::rt::v1::Argument{position:
+                                                                                                                    $crate::fmt::rt::v1::Position::At(1usize),
+                                                                                                                format:
+                                                                                                                    $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                                        ' ',
+                                                                                                                                                    align:
+                                                                                                                                                        $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                                    flags:
+                                                                                                                                                        0u32,
+                                                                                                                                                    precision:
+                                                                                                                                                        $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                                    width:
+                                                                                                                                                        $crate::fmt::rt::v1::Count::Implied,},}]));
+                };
+                let inserted = self.provider.bulkinsert(ips, &src);
+                if let Err(err) = inserted {
+                    {
+                        $crate::io::_print($crate::fmt::Arguments::new_v1_formatted(&["NodeProvider failed with : ",
+                                                                                      "\n"],
+                                                                                    &match (&err,)
+                                                                                         {
+                                                                                         (arg0,)
+                                                                                         =>
+                                                                                         [$crate::fmt::ArgumentV1::new(arg0,
+                                                                                                                       $crate::fmt::Display::fmt)],
+                                                                                     },
+                                                                                    &[$crate::fmt::rt::v1::Argument{position:
+                                                                                                                        $crate::fmt::rt::v1::Position::At(0usize),
+                                                                                                                    format:
+                                                                                                                        $crate::fmt::rt::v1::FormatSpec{fill:
+                                                                                                                                                            ' ',
+                                                                                                                                                        align:
+                                                                                                                                                            $crate::fmt::rt::v1::Alignment::Unknown,
+                                                                                                                                                        flags:
+                                                                                                                                                            0u32,
+                                                                                                                                                        precision:
+                                                                                                                                                            $crate::fmt::rt::v1::Count::Implied,
+                                                                                                                                                        width:
+                                                                                                                                                            $crate::fmt::rt::v1::Count::Implied,},}]));
+                    };
+                    continue ;
+                }
+            }
+        }
+    }
+}
+pub mod walker2 {
+    extern crate sm;
+    use sm::sm;
+    use sm::{AsEnum, Initializer, Machine as M, Transition};
+    #[allow(non_snake_case)]
+    mod RbtcCli {
+        use sm::{AsEnum, Event, InitialState, Initializer, Machine as M,
+                 NoneEvent, State, Transition};
+        #[structural_match]
+        pub struct Machine<S: State, E: Event>(S, Option<E>);
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl <S: $crate::fmt::Debug + State, E: $crate::fmt::Debug + Event>
+         $crate::fmt::Debug for Machine<S, E> {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    Machine(ref __self_0_0, ref __self_0_1) => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("Machine");
+                        let _ = debug_trait_builder.field(&&(*__self_0_0));
+                        let _ = debug_trait_builder.field(&&(*__self_0_1));
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl <S: $crate::cmp::Eq + State, E: $crate::cmp::Eq + Event>
+         $crate::cmp::Eq for Machine<S, E> {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () {
+                {
+                    let _: $crate::cmp::AssertParamIsEq<S>;
+                    let _: $crate::cmp::AssertParamIsEq<Option<E>>;
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl <S: $crate::cmp::PartialEq + State, E: $crate::cmp::PartialEq +
+              Event> $crate::cmp::PartialEq for Machine<S, E> {
+            #[inline]
+            fn eq(&self, other: &Machine<S, E>) -> bool {
+                match *other {
+                    Machine(ref __self_1_0, ref __self_1_1) =>
+                    match *self {
+                        Machine(ref __self_0_0, ref __self_0_1) =>
+                        (*__self_0_0) == (*__self_1_0) &&
+                            (*__self_0_1) == (*__self_1_1),
+                    },
+                }
+            }
+            #[inline]
+            fn ne(&self, other: &Machine<S, E>) -> bool {
+                match *other {
+                    Machine(ref __self_1_0, ref __self_1_1) =>
+                    match *self {
+                        Machine(ref __self_0_0, ref __self_0_1) =>
+                        (*__self_0_0) != (*__self_1_0) ||
+                            (*__self_0_1) != (*__self_1_1),
+                    },
+                }
+            }
+        }
+        impl <S: State, E: Event> M for Machine<S, E> {
+            type
+            State
+            =
+            S;
+            type
+            Event
+            =
+            E;
+            fn state(&self) -> Self::State { self.0.clone() }
+            fn trigger(&self) -> Option<Self::Event> { self.1.clone() }
+        }
+        impl <S: InitialState> Initializer<S> for Machine<S, NoneEvent> {
+            type
+            Machine
+            =
+            Machine<S, NoneEvent>;
+            fn new(state: S) -> Self::Machine { Machine(state, Option::None) }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct Init;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for Init {
+            #[inline]
+            fn clone(&self) -> Init { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for Init { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for Init {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    Init => {
+                        let mut debug_trait_builder = f.debug_tuple("Init");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for Init {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl State for Init { }
+        impl PartialEq<Init> for Init {
+            fn eq(&self, _: &Init) -> bool { true }
+        }
+        impl PartialEq<Connect> for Init {
+            fn eq(&self, _: &Connect) -> bool { false }
+        }
+        impl PartialEq<VersionSent> for Init {
+            fn eq(&self, _: &VersionSent) -> bool { false }
+        }
+        impl PartialEq<VersionReceived> for Init {
+            fn eq(&self, _: &VersionReceived) -> bool { false }
+        }
+        impl PartialEq<VerackReceived> for Init {
+            fn eq(&self, _: &VerackReceived) -> bool { false }
+        }
+        impl PartialEq<VerackSent> for Init {
+            fn eq(&self, _: &VerackSent) -> bool { false }
+        }
+        impl PartialEq<Handshake> for Init {
+            fn eq(&self, _: &Handshake) -> bool { false }
+        }
+        impl PartialEq<GetAddr> for Init {
+            fn eq(&self, _: &GetAddr) -> bool { false }
+        }
+        impl PartialEq<Addr> for Init {
+            fn eq(&self, _: &Addr) -> bool { false }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct Connect;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for Connect {
+            #[inline]
+            fn clone(&self) -> Connect { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for Connect { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for Connect {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    Connect => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("Connect");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for Connect {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl State for Connect { }
+        impl PartialEq<Init> for Connect {
+            fn eq(&self, _: &Init) -> bool { false }
+        }
+        impl PartialEq<Connect> for Connect {
+            fn eq(&self, _: &Connect) -> bool { true }
+        }
+        impl PartialEq<VersionSent> for Connect {
+            fn eq(&self, _: &VersionSent) -> bool { false }
+        }
+        impl PartialEq<VersionReceived> for Connect {
+            fn eq(&self, _: &VersionReceived) -> bool { false }
+        }
+        impl PartialEq<VerackReceived> for Connect {
+            fn eq(&self, _: &VerackReceived) -> bool { false }
+        }
+        impl PartialEq<VerackSent> for Connect {
+            fn eq(&self, _: &VerackSent) -> bool { false }
+        }
+        impl PartialEq<Handshake> for Connect {
+            fn eq(&self, _: &Handshake) -> bool { false }
+        }
+        impl PartialEq<GetAddr> for Connect {
+            fn eq(&self, _: &GetAddr) -> bool { false }
+        }
+        impl PartialEq<Addr> for Connect {
+            fn eq(&self, _: &Addr) -> bool { false }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct VersionSent;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for VersionSent {
+            #[inline]
+            fn clone(&self) -> VersionSent { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for VersionSent { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for VersionSent {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    VersionSent => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("VersionSent");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for VersionSent {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl State for VersionSent { }
+        impl PartialEq<Init> for VersionSent {
+            fn eq(&self, _: &Init) -> bool { false }
+        }
+        impl PartialEq<Connect> for VersionSent {
+            fn eq(&self, _: &Connect) -> bool { false }
+        }
+        impl PartialEq<VersionSent> for VersionSent {
+            fn eq(&self, _: &VersionSent) -> bool { true }
+        }
+        impl PartialEq<VersionReceived> for VersionSent {
+            fn eq(&self, _: &VersionReceived) -> bool { false }
+        }
+        impl PartialEq<VerackReceived> for VersionSent {
+            fn eq(&self, _: &VerackReceived) -> bool { false }
+        }
+        impl PartialEq<VerackSent> for VersionSent {
+            fn eq(&self, _: &VerackSent) -> bool { false }
+        }
+        impl PartialEq<Handshake> for VersionSent {
+            fn eq(&self, _: &Handshake) -> bool { false }
+        }
+        impl PartialEq<GetAddr> for VersionSent {
+            fn eq(&self, _: &GetAddr) -> bool { false }
+        }
+        impl PartialEq<Addr> for VersionSent {
+            fn eq(&self, _: &Addr) -> bool { false }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct VersionReceived;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for VersionReceived {
+            #[inline]
+            fn clone(&self) -> VersionReceived { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for VersionReceived { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for VersionReceived {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    VersionReceived => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("VersionReceived");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for VersionReceived {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl State for VersionReceived { }
+        impl PartialEq<Init> for VersionReceived {
+            fn eq(&self, _: &Init) -> bool { false }
+        }
+        impl PartialEq<Connect> for VersionReceived {
+            fn eq(&self, _: &Connect) -> bool { false }
+        }
+        impl PartialEq<VersionSent> for VersionReceived {
+            fn eq(&self, _: &VersionSent) -> bool { false }
+        }
+        impl PartialEq<VersionReceived> for VersionReceived {
+            fn eq(&self, _: &VersionReceived) -> bool { true }
+        }
+        impl PartialEq<VerackReceived> for VersionReceived {
+            fn eq(&self, _: &VerackReceived) -> bool { false }
+        }
+        impl PartialEq<VerackSent> for VersionReceived {
+            fn eq(&self, _: &VerackSent) -> bool { false }
+        }
+        impl PartialEq<Handshake> for VersionReceived {
+            fn eq(&self, _: &Handshake) -> bool { false }
+        }
+        impl PartialEq<GetAddr> for VersionReceived {
+            fn eq(&self, _: &GetAddr) -> bool { false }
+        }
+        impl PartialEq<Addr> for VersionReceived {
+            fn eq(&self, _: &Addr) -> bool { false }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct VerackReceived;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for VerackReceived {
+            #[inline]
+            fn clone(&self) -> VerackReceived { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for VerackReceived { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for VerackReceived {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    VerackReceived => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("VerackReceived");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for VerackReceived {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl State for VerackReceived { }
+        impl PartialEq<Init> for VerackReceived {
+            fn eq(&self, _: &Init) -> bool { false }
+        }
+        impl PartialEq<Connect> for VerackReceived {
+            fn eq(&self, _: &Connect) -> bool { false }
+        }
+        impl PartialEq<VersionSent> for VerackReceived {
+            fn eq(&self, _: &VersionSent) -> bool { false }
+        }
+        impl PartialEq<VersionReceived> for VerackReceived {
+            fn eq(&self, _: &VersionReceived) -> bool { false }
+        }
+        impl PartialEq<VerackReceived> for VerackReceived {
+            fn eq(&self, _: &VerackReceived) -> bool { true }
+        }
+        impl PartialEq<VerackSent> for VerackReceived {
+            fn eq(&self, _: &VerackSent) -> bool { false }
+        }
+        impl PartialEq<Handshake> for VerackReceived {
+            fn eq(&self, _: &Handshake) -> bool { false }
+        }
+        impl PartialEq<GetAddr> for VerackReceived {
+            fn eq(&self, _: &GetAddr) -> bool { false }
+        }
+        impl PartialEq<Addr> for VerackReceived {
+            fn eq(&self, _: &Addr) -> bool { false }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct VerackSent;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for VerackSent {
+            #[inline]
+            fn clone(&self) -> VerackSent { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for VerackSent { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for VerackSent {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    VerackSent => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("VerackSent");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for VerackSent {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl State for VerackSent { }
+        impl PartialEq<Init> for VerackSent {
+            fn eq(&self, _: &Init) -> bool { false }
+        }
+        impl PartialEq<Connect> for VerackSent {
+            fn eq(&self, _: &Connect) -> bool { false }
+        }
+        impl PartialEq<VersionSent> for VerackSent {
+            fn eq(&self, _: &VersionSent) -> bool { false }
+        }
+        impl PartialEq<VersionReceived> for VerackSent {
+            fn eq(&self, _: &VersionReceived) -> bool { false }
+        }
+        impl PartialEq<VerackReceived> for VerackSent {
+            fn eq(&self, _: &VerackReceived) -> bool { false }
+        }
+        impl PartialEq<VerackSent> for VerackSent {
+            fn eq(&self, _: &VerackSent) -> bool { true }
+        }
+        impl PartialEq<Handshake> for VerackSent {
+            fn eq(&self, _: &Handshake) -> bool { false }
+        }
+        impl PartialEq<GetAddr> for VerackSent {
+            fn eq(&self, _: &GetAddr) -> bool { false }
+        }
+        impl PartialEq<Addr> for VerackSent {
+            fn eq(&self, _: &Addr) -> bool { false }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct Handshake;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for Handshake {
+            #[inline]
+            fn clone(&self) -> Handshake { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for Handshake { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for Handshake {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    Handshake => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("Handshake");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for Handshake {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl State for Handshake { }
+        impl PartialEq<Init> for Handshake {
+            fn eq(&self, _: &Init) -> bool { false }
+        }
+        impl PartialEq<Connect> for Handshake {
+            fn eq(&self, _: &Connect) -> bool { false }
+        }
+        impl PartialEq<VersionSent> for Handshake {
+            fn eq(&self, _: &VersionSent) -> bool { false }
+        }
+        impl PartialEq<VersionReceived> for Handshake {
+            fn eq(&self, _: &VersionReceived) -> bool { false }
+        }
+        impl PartialEq<VerackReceived> for Handshake {
+            fn eq(&self, _: &VerackReceived) -> bool { false }
+        }
+        impl PartialEq<VerackSent> for Handshake {
+            fn eq(&self, _: &VerackSent) -> bool { false }
+        }
+        impl PartialEq<Handshake> for Handshake {
+            fn eq(&self, _: &Handshake) -> bool { true }
+        }
+        impl PartialEq<GetAddr> for Handshake {
+            fn eq(&self, _: &GetAddr) -> bool { false }
+        }
+        impl PartialEq<Addr> for Handshake {
+            fn eq(&self, _: &Addr) -> bool { false }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct GetAddr;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for GetAddr {
+            #[inline]
+            fn clone(&self) -> GetAddr { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for GetAddr { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for GetAddr {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    GetAddr => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("GetAddr");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for GetAddr {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl State for GetAddr { }
+        impl PartialEq<Init> for GetAddr {
+            fn eq(&self, _: &Init) -> bool { false }
+        }
+        impl PartialEq<Connect> for GetAddr {
+            fn eq(&self, _: &Connect) -> bool { false }
+        }
+        impl PartialEq<VersionSent> for GetAddr {
+            fn eq(&self, _: &VersionSent) -> bool { false }
+        }
+        impl PartialEq<VersionReceived> for GetAddr {
+            fn eq(&self, _: &VersionReceived) -> bool { false }
+        }
+        impl PartialEq<VerackReceived> for GetAddr {
+            fn eq(&self, _: &VerackReceived) -> bool { false }
+        }
+        impl PartialEq<VerackSent> for GetAddr {
+            fn eq(&self, _: &VerackSent) -> bool { false }
+        }
+        impl PartialEq<Handshake> for GetAddr {
+            fn eq(&self, _: &Handshake) -> bool { false }
+        }
+        impl PartialEq<GetAddr> for GetAddr {
+            fn eq(&self, _: &GetAddr) -> bool { true }
+        }
+        impl PartialEq<Addr> for GetAddr {
+            fn eq(&self, _: &Addr) -> bool { false }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct Addr;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for Addr {
+            #[inline]
+            fn clone(&self) -> Addr { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for Addr { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for Addr {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    Addr => {
+                        let mut debug_trait_builder = f.debug_tuple("Addr");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for Addr {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl State for Addr { }
+        impl PartialEq<Init> for Addr {
+            fn eq(&self, _: &Init) -> bool { false }
+        }
+        impl PartialEq<Connect> for Addr {
+            fn eq(&self, _: &Connect) -> bool { false }
+        }
+        impl PartialEq<VersionSent> for Addr {
+            fn eq(&self, _: &VersionSent) -> bool { false }
+        }
+        impl PartialEq<VersionReceived> for Addr {
+            fn eq(&self, _: &VersionReceived) -> bool { false }
+        }
+        impl PartialEq<VerackReceived> for Addr {
+            fn eq(&self, _: &VerackReceived) -> bool { false }
+        }
+        impl PartialEq<VerackSent> for Addr {
+            fn eq(&self, _: &VerackSent) -> bool { false }
+        }
+        impl PartialEq<Handshake> for Addr {
+            fn eq(&self, _: &Handshake) -> bool { false }
+        }
+        impl PartialEq<GetAddr> for Addr {
+            fn eq(&self, _: &GetAddr) -> bool { false }
+        }
+        impl PartialEq<Addr> for Addr {
+            fn eq(&self, _: &Addr) -> bool { true }
+        }
+        impl InitialState for Init { }
+        #[rustc_copy_clone_marker]
+        pub struct ConnectSocket;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for ConnectSocket {
+            #[inline]
+            fn clone(&self) -> ConnectSocket { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for ConnectSocket { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for ConnectSocket {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    ConnectSocket => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("ConnectSocket");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for ConnectSocket {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl Event for ConnectSocket { }
+        impl PartialEq<ConnectSocket> for ConnectSocket {
+            fn eq(&self, _: &ConnectSocket) -> bool { true }
+        }
+        impl PartialEq<ConnectFailed> for ConnectSocket {
+            fn eq(&self, _: &ConnectFailed) -> bool { false }
+        }
+        impl PartialEq<SendVersion> for ConnectSocket {
+            fn eq(&self, _: &SendVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVersion> for ConnectSocket {
+            fn eq(&self, _: &ReceiveVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVerack> for ConnectSocket {
+            fn eq(&self, _: &ReceiveVerack) -> bool { false }
+        }
+        impl PartialEq<SendVerack> for ConnectSocket {
+            fn eq(&self, _: &SendVerack) -> bool { false }
+        }
+        impl PartialEq<SetVersion> for ConnectSocket {
+            fn eq(&self, _: &SetVersion) -> bool { false }
+        }
+        impl PartialEq<SendAddr> for ConnectSocket {
+            fn eq(&self, _: &SendAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveAddr> for ConnectSocket {
+            fn eq(&self, _: &ReceiveAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveOther> for ConnectSocket {
+            fn eq(&self, _: &ReceiveOther) -> bool { false }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct ConnectFailed;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for ConnectFailed {
+            #[inline]
+            fn clone(&self) -> ConnectFailed { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for ConnectFailed { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for ConnectFailed {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    ConnectFailed => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("ConnectFailed");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for ConnectFailed {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl Event for ConnectFailed { }
+        impl PartialEq<ConnectSocket> for ConnectFailed {
+            fn eq(&self, _: &ConnectSocket) -> bool { false }
+        }
+        impl PartialEq<ConnectFailed> for ConnectFailed {
+            fn eq(&self, _: &ConnectFailed) -> bool { true }
+        }
+        impl PartialEq<SendVersion> for ConnectFailed {
+            fn eq(&self, _: &SendVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVersion> for ConnectFailed {
+            fn eq(&self, _: &ReceiveVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVerack> for ConnectFailed {
+            fn eq(&self, _: &ReceiveVerack) -> bool { false }
+        }
+        impl PartialEq<SendVerack> for ConnectFailed {
+            fn eq(&self, _: &SendVerack) -> bool { false }
+        }
+        impl PartialEq<SetVersion> for ConnectFailed {
+            fn eq(&self, _: &SetVersion) -> bool { false }
+        }
+        impl PartialEq<SendAddr> for ConnectFailed {
+            fn eq(&self, _: &SendAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveAddr> for ConnectFailed {
+            fn eq(&self, _: &ReceiveAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveOther> for ConnectFailed {
+            fn eq(&self, _: &ReceiveOther) -> bool { false }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct SendVersion;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for SendVersion {
+            #[inline]
+            fn clone(&self) -> SendVersion { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for SendVersion { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for SendVersion {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    SendVersion => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("SendVersion");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for SendVersion {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl Event for SendVersion { }
+        impl PartialEq<ConnectSocket> for SendVersion {
+            fn eq(&self, _: &ConnectSocket) -> bool { false }
+        }
+        impl PartialEq<ConnectFailed> for SendVersion {
+            fn eq(&self, _: &ConnectFailed) -> bool { false }
+        }
+        impl PartialEq<SendVersion> for SendVersion {
+            fn eq(&self, _: &SendVersion) -> bool { true }
+        }
+        impl PartialEq<ReceiveVersion> for SendVersion {
+            fn eq(&self, _: &ReceiveVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVerack> for SendVersion {
+            fn eq(&self, _: &ReceiveVerack) -> bool { false }
+        }
+        impl PartialEq<SendVerack> for SendVersion {
+            fn eq(&self, _: &SendVerack) -> bool { false }
+        }
+        impl PartialEq<SetVersion> for SendVersion {
+            fn eq(&self, _: &SetVersion) -> bool { false }
+        }
+        impl PartialEq<SendAddr> for SendVersion {
+            fn eq(&self, _: &SendAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveAddr> for SendVersion {
+            fn eq(&self, _: &ReceiveAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveOther> for SendVersion {
+            fn eq(&self, _: &ReceiveOther) -> bool { false }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct ReceiveVersion;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for ReceiveVersion {
+            #[inline]
+            fn clone(&self) -> ReceiveVersion { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for ReceiveVersion { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for ReceiveVersion {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    ReceiveVersion => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("ReceiveVersion");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for ReceiveVersion {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl Event for ReceiveVersion { }
+        impl PartialEq<ConnectSocket> for ReceiveVersion {
+            fn eq(&self, _: &ConnectSocket) -> bool { false }
+        }
+        impl PartialEq<ConnectFailed> for ReceiveVersion {
+            fn eq(&self, _: &ConnectFailed) -> bool { false }
+        }
+        impl PartialEq<SendVersion> for ReceiveVersion {
+            fn eq(&self, _: &SendVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVersion> for ReceiveVersion {
+            fn eq(&self, _: &ReceiveVersion) -> bool { true }
+        }
+        impl PartialEq<ReceiveVerack> for ReceiveVersion {
+            fn eq(&self, _: &ReceiveVerack) -> bool { false }
+        }
+        impl PartialEq<SendVerack> for ReceiveVersion {
+            fn eq(&self, _: &SendVerack) -> bool { false }
+        }
+        impl PartialEq<SetVersion> for ReceiveVersion {
+            fn eq(&self, _: &SetVersion) -> bool { false }
+        }
+        impl PartialEq<SendAddr> for ReceiveVersion {
+            fn eq(&self, _: &SendAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveAddr> for ReceiveVersion {
+            fn eq(&self, _: &ReceiveAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveOther> for ReceiveVersion {
+            fn eq(&self, _: &ReceiveOther) -> bool { false }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct ReceiveVerack;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for ReceiveVerack {
+            #[inline]
+            fn clone(&self) -> ReceiveVerack { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for ReceiveVerack { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for ReceiveVerack {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    ReceiveVerack => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("ReceiveVerack");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for ReceiveVerack {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl Event for ReceiveVerack { }
+        impl PartialEq<ConnectSocket> for ReceiveVerack {
+            fn eq(&self, _: &ConnectSocket) -> bool { false }
+        }
+        impl PartialEq<ConnectFailed> for ReceiveVerack {
+            fn eq(&self, _: &ConnectFailed) -> bool { false }
+        }
+        impl PartialEq<SendVersion> for ReceiveVerack {
+            fn eq(&self, _: &SendVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVersion> for ReceiveVerack {
+            fn eq(&self, _: &ReceiveVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVerack> for ReceiveVerack {
+            fn eq(&self, _: &ReceiveVerack) -> bool { true }
+        }
+        impl PartialEq<SendVerack> for ReceiveVerack {
+            fn eq(&self, _: &SendVerack) -> bool { false }
+        }
+        impl PartialEq<SetVersion> for ReceiveVerack {
+            fn eq(&self, _: &SetVersion) -> bool { false }
+        }
+        impl PartialEq<SendAddr> for ReceiveVerack {
+            fn eq(&self, _: &SendAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveAddr> for ReceiveVerack {
+            fn eq(&self, _: &ReceiveAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveOther> for ReceiveVerack {
+            fn eq(&self, _: &ReceiveOther) -> bool { false }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct SendVerack;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for SendVerack {
+            #[inline]
+            fn clone(&self) -> SendVerack { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for SendVerack { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for SendVerack {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    SendVerack => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("SendVerack");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for SendVerack {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl Event for SendVerack { }
+        impl PartialEq<ConnectSocket> for SendVerack {
+            fn eq(&self, _: &ConnectSocket) -> bool { false }
+        }
+        impl PartialEq<ConnectFailed> for SendVerack {
+            fn eq(&self, _: &ConnectFailed) -> bool { false }
+        }
+        impl PartialEq<SendVersion> for SendVerack {
+            fn eq(&self, _: &SendVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVersion> for SendVerack {
+            fn eq(&self, _: &ReceiveVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVerack> for SendVerack {
+            fn eq(&self, _: &ReceiveVerack) -> bool { false }
+        }
+        impl PartialEq<SendVerack> for SendVerack {
+            fn eq(&self, _: &SendVerack) -> bool { true }
+        }
+        impl PartialEq<SetVersion> for SendVerack {
+            fn eq(&self, _: &SetVersion) -> bool { false }
+        }
+        impl PartialEq<SendAddr> for SendVerack {
+            fn eq(&self, _: &SendAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveAddr> for SendVerack {
+            fn eq(&self, _: &ReceiveAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveOther> for SendVerack {
+            fn eq(&self, _: &ReceiveOther) -> bool { false }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct SetVersion;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for SetVersion {
+            #[inline]
+            fn clone(&self) -> SetVersion { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for SetVersion { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for SetVersion {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    SetVersion => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("SetVersion");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for SetVersion {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl Event for SetVersion { }
+        impl PartialEq<ConnectSocket> for SetVersion {
+            fn eq(&self, _: &ConnectSocket) -> bool { false }
+        }
+        impl PartialEq<ConnectFailed> for SetVersion {
+            fn eq(&self, _: &ConnectFailed) -> bool { false }
+        }
+        impl PartialEq<SendVersion> for SetVersion {
+            fn eq(&self, _: &SendVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVersion> for SetVersion {
+            fn eq(&self, _: &ReceiveVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVerack> for SetVersion {
+            fn eq(&self, _: &ReceiveVerack) -> bool { false }
+        }
+        impl PartialEq<SendVerack> for SetVersion {
+            fn eq(&self, _: &SendVerack) -> bool { false }
+        }
+        impl PartialEq<SetVersion> for SetVersion {
+            fn eq(&self, _: &SetVersion) -> bool { true }
+        }
+        impl PartialEq<SendAddr> for SetVersion {
+            fn eq(&self, _: &SendAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveAddr> for SetVersion {
+            fn eq(&self, _: &ReceiveAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveOther> for SetVersion {
+            fn eq(&self, _: &ReceiveOther) -> bool { false }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct SendAddr;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for SendAddr {
+            #[inline]
+            fn clone(&self) -> SendAddr { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for SendAddr { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for SendAddr {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    SendAddr => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("SendAddr");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for SendAddr {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl Event for SendAddr { }
+        impl PartialEq<ConnectSocket> for SendAddr {
+            fn eq(&self, _: &ConnectSocket) -> bool { false }
+        }
+        impl PartialEq<ConnectFailed> for SendAddr {
+            fn eq(&self, _: &ConnectFailed) -> bool { false }
+        }
+        impl PartialEq<SendVersion> for SendAddr {
+            fn eq(&self, _: &SendVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVersion> for SendAddr {
+            fn eq(&self, _: &ReceiveVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVerack> for SendAddr {
+            fn eq(&self, _: &ReceiveVerack) -> bool { false }
+        }
+        impl PartialEq<SendVerack> for SendAddr {
+            fn eq(&self, _: &SendVerack) -> bool { false }
+        }
+        impl PartialEq<SetVersion> for SendAddr {
+            fn eq(&self, _: &SetVersion) -> bool { false }
+        }
+        impl PartialEq<SendAddr> for SendAddr {
+            fn eq(&self, _: &SendAddr) -> bool { true }
+        }
+        impl PartialEq<ReceiveAddr> for SendAddr {
+            fn eq(&self, _: &ReceiveAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveOther> for SendAddr {
+            fn eq(&self, _: &ReceiveOther) -> bool { false }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct ReceiveAddr;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for ReceiveAddr {
+            #[inline]
+            fn clone(&self) -> ReceiveAddr { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for ReceiveAddr { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for ReceiveAddr {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    ReceiveAddr => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("ReceiveAddr");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for ReceiveAddr {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl Event for ReceiveAddr { }
+        impl PartialEq<ConnectSocket> for ReceiveAddr {
+            fn eq(&self, _: &ConnectSocket) -> bool { false }
+        }
+        impl PartialEq<ConnectFailed> for ReceiveAddr {
+            fn eq(&self, _: &ConnectFailed) -> bool { false }
+        }
+        impl PartialEq<SendVersion> for ReceiveAddr {
+            fn eq(&self, _: &SendVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVersion> for ReceiveAddr {
+            fn eq(&self, _: &ReceiveVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVerack> for ReceiveAddr {
+            fn eq(&self, _: &ReceiveVerack) -> bool { false }
+        }
+        impl PartialEq<SendVerack> for ReceiveAddr {
+            fn eq(&self, _: &SendVerack) -> bool { false }
+        }
+        impl PartialEq<SetVersion> for ReceiveAddr {
+            fn eq(&self, _: &SetVersion) -> bool { false }
+        }
+        impl PartialEq<SendAddr> for ReceiveAddr {
+            fn eq(&self, _: &SendAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveAddr> for ReceiveAddr {
+            fn eq(&self, _: &ReceiveAddr) -> bool { true }
+        }
+        impl PartialEq<ReceiveOther> for ReceiveAddr {
+            fn eq(&self, _: &ReceiveOther) -> bool { false }
+        }
+        #[rustc_copy_clone_marker]
+        pub struct ReceiveOther;
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::clone::Clone for ReceiveOther {
+            #[inline]
+            fn clone(&self) -> ReceiveOther { { *self } }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::marker::Copy for ReceiveOther { }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for ReceiveOther {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match *self {
+                    ReceiveOther => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("ReceiveOther");
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::cmp::Eq for ReceiveOther {
+            #[inline]
+            #[doc(hidden)]
+            fn assert_receiver_is_total_eq(&self) -> () { { } }
+        }
+        impl Event for ReceiveOther { }
+        impl PartialEq<ConnectSocket> for ReceiveOther {
+            fn eq(&self, _: &ConnectSocket) -> bool { false }
+        }
+        impl PartialEq<ConnectFailed> for ReceiveOther {
+            fn eq(&self, _: &ConnectFailed) -> bool { false }
+        }
+        impl PartialEq<SendVersion> for ReceiveOther {
+            fn eq(&self, _: &SendVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVersion> for ReceiveOther {
+            fn eq(&self, _: &ReceiveVersion) -> bool { false }
+        }
+        impl PartialEq<ReceiveVerack> for ReceiveOther {
+            fn eq(&self, _: &ReceiveVerack) -> bool { false }
+        }
+        impl PartialEq<SendVerack> for ReceiveOther {
+            fn eq(&self, _: &SendVerack) -> bool { false }
+        }
+        impl PartialEq<SetVersion> for ReceiveOther {
+            fn eq(&self, _: &SetVersion) -> bool { false }
+        }
+        impl PartialEq<SendAddr> for ReceiveOther {
+            fn eq(&self, _: &SendAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveAddr> for ReceiveOther {
+            fn eq(&self, _: &ReceiveAddr) -> bool { false }
+        }
+        impl PartialEq<ReceiveOther> for ReceiveOther {
+            fn eq(&self, _: &ReceiveOther) -> bool { true }
+        }
+        pub enum Variant {
+            InitialInit(Machine<Init, NoneEvent>),
+            ConnectByConnectSocket(Machine<Connect, ConnectSocket>),
+            InitByConnectFailed(Machine<Init, ConnectFailed>),
+            VersionSentBySendVersion(Machine<VersionSent, SendVersion>),
+            VersionReceivedByReceiveVersion(Machine<VersionReceived,
+                                                    ReceiveVersion>),
+            VerackReceivedByReceiveVerack(Machine<VerackReceived,
+                                                  ReceiveVerack>),
+            VerackSentBySendVerack(Machine<VerackSent, SendVerack>),
+            HandshakeBySetVersion(Machine<Handshake, SetVersion>),
+            GetAddrBySendAddr(Machine<GetAddr, SendAddr>),
+            AddrByReceiveAddr(Machine<Addr, ReceiveAddr>),
+            HandshakeByReceiveOther(Machine<Handshake, ReceiveOther>),
+        }
+        #[automatically_derived]
+        #[allow(unused_qualifications)]
+        impl $crate::fmt::Debug for Variant {
+            fn fmt(&self, f: &mut $crate::fmt::Formatter)
+             -> $crate::fmt::Result {
+                match (&*self,) {
+                    (&Variant::InitialInit(ref __self_0),) => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("InitialInit");
+                        let _ = debug_trait_builder.field(&&(*__self_0));
+                        debug_trait_builder.finish()
+                    }
+                    (&Variant::ConnectByConnectSocket(ref __self_0),) => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("ConnectByConnectSocket");
+                        let _ = debug_trait_builder.field(&&(*__self_0));
+                        debug_trait_builder.finish()
+                    }
+                    (&Variant::InitByConnectFailed(ref __self_0),) => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("InitByConnectFailed");
+                        let _ = debug_trait_builder.field(&&(*__self_0));
+                        debug_trait_builder.finish()
+                    }
+                    (&Variant::VersionSentBySendVersion(ref __self_0),) => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("VersionSentBySendVersion");
+                        let _ = debug_trait_builder.field(&&(*__self_0));
+                        debug_trait_builder.finish()
+                    }
+                    (&Variant::VersionReceivedByReceiveVersion(ref __self_0),)
+                    => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("VersionReceivedByReceiveVersion");
+                        let _ = debug_trait_builder.field(&&(*__self_0));
+                        debug_trait_builder.finish()
+                    }
+                    (&Variant::VerackReceivedByReceiveVerack(ref __self_0),)
+                    => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("VerackReceivedByReceiveVerack");
+                        let _ = debug_trait_builder.field(&&(*__self_0));
+                        debug_trait_builder.finish()
+                    }
+                    (&Variant::VerackSentBySendVerack(ref __self_0),) => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("VerackSentBySendVerack");
+                        let _ = debug_trait_builder.field(&&(*__self_0));
+                        debug_trait_builder.finish()
+                    }
+                    (&Variant::HandshakeBySetVersion(ref __self_0),) => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("HandshakeBySetVersion");
+                        let _ = debug_trait_builder.field(&&(*__self_0));
+                        debug_trait_builder.finish()
+                    }
+                    (&Variant::GetAddrBySendAddr(ref __self_0),) => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("GetAddrBySendAddr");
+                        let _ = debug_trait_builder.field(&&(*__self_0));
+                        debug_trait_builder.finish()
+                    }
+                    (&Variant::AddrByReceiveAddr(ref __self_0),) => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("AddrByReceiveAddr");
+                        let _ = debug_trait_builder.field(&&(*__self_0));
+                        debug_trait_builder.finish()
+                    }
+                    (&Variant::HandshakeByReceiveOther(ref __self_0),) => {
+                        let mut debug_trait_builder =
+                            f.debug_tuple("HandshakeByReceiveOther");
+                        let _ = debug_trait_builder.field(&&(*__self_0));
+                        debug_trait_builder.finish()
+                    }
+                }
+            }
+        }
+        impl AsEnum for Machine<Init, NoneEvent> {
+            type
+            Enum
+            =
+            Variant;
+            fn as_enum(self) -> Self::Enum { Variant::InitialInit(self) }
+        }
+        impl AsEnum for Machine<Connect, ConnectSocket> {
+            type
+            Enum
+            =
+            Variant;
+            fn as_enum(self) -> Self::Enum {
+                Variant::ConnectByConnectSocket(self)
+            }
+        }
+        impl AsEnum for Machine<Init, ConnectFailed> {
+            type
+            Enum
+            =
+            Variant;
+            fn as_enum(self) -> Self::Enum {
+                Variant::InitByConnectFailed(self)
+            }
+        }
+        impl AsEnum for Machine<VersionSent, SendVersion> {
+            type
+            Enum
+            =
+            Variant;
+            fn as_enum(self) -> Self::Enum {
+                Variant::VersionSentBySendVersion(self)
+            }
+        }
+        impl AsEnum for Machine<VersionReceived, ReceiveVersion> {
+            type
+            Enum
+            =
+            Variant;
+            fn as_enum(self) -> Self::Enum {
+                Variant::VersionReceivedByReceiveVersion(self)
+            }
+        }
+        impl AsEnum for Machine<VerackReceived, ReceiveVerack> {
+            type
+            Enum
+            =
+            Variant;
+            fn as_enum(self) -> Self::Enum {
+                Variant::VerackReceivedByReceiveVerack(self)
+            }
+        }
+        impl AsEnum for Machine<VerackSent, SendVerack> {
+            type
+            Enum
+            =
+            Variant;
+            fn as_enum(self) -> Self::Enum {
+                Variant::VerackSentBySendVerack(self)
+            }
+        }
+        impl AsEnum for Machine<Handshake, SetVersion> {
+            type
+            Enum
+            =
+            Variant;
+            fn as_enum(self) -> Self::Enum {
+                Variant::HandshakeBySetVersion(self)
+            }
+        }
+        impl AsEnum for Machine<GetAddr, SendAddr> {
+            type
+            Enum
+            =
+            Variant;
+            fn as_enum(self) -> Self::Enum {
+                Variant::GetAddrBySendAddr(self)
+            }
+        }
+        impl AsEnum for Machine<Addr, ReceiveAddr> {
+            type
+            Enum
+            =
+            Variant;
+            fn as_enum(self) -> Self::Enum {
+                Variant::AddrByReceiveAddr(self)
+            }
+        }
+        impl AsEnum for Machine<Handshake, ReceiveOther> {
+            type
+            Enum
+            =
+            Variant;
+            fn as_enum(self) -> Self::Enum {
+                Variant::HandshakeByReceiveOther(self)
+            }
+        }
+        impl <E: Event> Transition<ConnectSocket> for Machine<Init, E> {
+            type
+            Machine
+            =
+            Machine<Connect, ConnectSocket>;
+            fn transition(self, event: ConnectSocket) -> Self::Machine {
+                Machine(Connect, Some(event))
+            }
+        }
+        impl <E: Event> Transition<ConnectFailed> for Machine<Init, E> {
+            type
+            Machine
+            =
+            Machine<Init, ConnectFailed>;
+            fn transition(self, event: ConnectFailed) -> Self::Machine {
+                Machine(Init, Some(event))
+            }
+        }
+        impl <E: Event> Transition<SendVersion> for Machine<Connect, E> {
+            type
+            Machine
+            =
+            Machine<VersionSent, SendVersion>;
+            fn transition(self, event: SendVersion) -> Self::Machine {
+                Machine(VersionSent, Some(event))
+            }
+        }
+        impl <E: Event> Transition<ReceiveVersion> for Machine<VersionSent, E>
+         {
+            type
+            Machine
+            =
+            Machine<VersionReceived, ReceiveVersion>;
+            fn transition(self, event: ReceiveVersion) -> Self::Machine {
+                Machine(VersionReceived, Some(event))
+            }
+        }
+        impl <E: Event> Transition<ReceiveVerack> for
+         Machine<VersionReceived, E> {
+            type
+            Machine
+            =
+            Machine<VerackReceived, ReceiveVerack>;
+            fn transition(self, event: ReceiveVerack) -> Self::Machine {
+                Machine(VerackReceived, Some(event))
+            }
+        }
+        impl <E: Event> Transition<SendVerack> for Machine<VerackReceived, E>
+         {
+            type
+            Machine
+            =
+            Machine<VerackSent, SendVerack>;
+            fn transition(self, event: SendVerack) -> Self::Machine {
+                Machine(VerackSent, Some(event))
+            }
+        }
+        impl <E: Event> Transition<SetVersion> for Machine<VerackSent, E> {
+            type
+            Machine
+            =
+            Machine<Handshake, SetVersion>;
+            fn transition(self, event: SetVersion) -> Self::Machine {
+                Machine(Handshake, Some(event))
+            }
+        }
+        impl <E: Event> Transition<SendAddr> for Machine<Handshake, E> {
+            type
+            Machine
+            =
+            Machine<GetAddr, SendAddr>;
+            fn transition(self, event: SendAddr) -> Self::Machine {
+                Machine(GetAddr, Some(event))
+            }
+        }
+        impl <E: Event> Transition<ReceiveAddr> for Machine<GetAddr, E> {
+            type
+            Machine
+            =
+            Machine<Addr, ReceiveAddr>;
+            fn transition(self, event: ReceiveAddr) -> Self::Machine {
+                Machine(Addr, Some(event))
+            }
+        }
+        impl <E: Event> Transition<ReceiveOther> for Machine<Handshake, E> {
+            type
+            Machine
+            =
+            Machine<Handshake, ReceiveOther>;
+            fn transition(self, event: ReceiveOther) -> Self::Machine {
+                Machine(Handshake, Some(event))
+            }
+        }
+        impl <E: Event> Transition<ReceiveOther> for Machine<GetAddr, E> {
+            type
+            Machine
+            =
+            Machine<Handshake, ReceiveOther>;
+            fn transition(self, event: ReceiveOther) -> Self::Machine {
+                Machine(Handshake, Some(event))
+            }
+        }
+    }
+}
+use std::path::Path;
+fn main() {
+    {
+        $crate::io::_print($crate::fmt::Arguments::new_v1(&["rbtc_nodewalker 0.2.0 (q)\n"],
+                                                          &match () {
+                                                               () => [],
+                                                           }));
+    };
+    let config =
+        config::Config{dns_seeds:
+                           <[_]>::into_vec(box
+                                               [String::from("seed.bitcoin.sipa.be"),
+                                                String::from("dnsseed.bluematt.me"),
+                                                String::from("dnsseed.bitcoin.dashjr.org"),
+                                                String::from("seed.bitcoinstats.com"),
+                                                String::from("seed.bitcoin.jonasschnelli.ch"),
+                                                String::from("seed.btc.petertodd.org"),
+                                                String::from("seed.bitcoin.sprovoost.nl")]),
+                       sqlite_path: Path::new("./nodes.sqlite"),};
+    let resolver = resolver::Resolver::new(config.dns_seeds);
+    let provider = provider::NodeProvider::new(&config.sqlite_path).unwrap();
+    let program = program::Program::new(resolver, provider);
+    program.run();
+}

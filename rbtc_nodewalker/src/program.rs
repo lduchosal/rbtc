@@ -70,22 +70,10 @@ impl Program {
         for node in nodes {
 
             let src = node.ip;
-            let walker_result = walker::NodeWalker::new(&src);
-
-            if let Err(err) = walker_result {
-                println!("NodeWalker new {} failed with : {}", src, err);
-                println!("NodeWalker new failed with : {}", err);
-                continue;
-            }
-
-            let walked = walker_result.unwrap().walk();
+            let mut walker = walker::NodeWalker::new(&src);
+            walker.run();
             
-            if let Err(err) = walked {
-                println!("NodeWalker failed with : {}", err);
-                continue;
-            }
-
-            let ips = walked.unwrap();
+            let ips = walker.ips();
             println!("NodeWalker got {} new ips from {}", ips.len(), src);
             let inserted = self.provider.bulkinsert(ips, &src);
 

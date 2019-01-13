@@ -6,6 +6,7 @@ pub mod provider;
 pub mod node;
 pub mod walker;
 pub mod program;
+pub mod message;
 
 use std::path::Path;
 

@@ -9,6 +9,7 @@ dns-lookup = "1.0.0"
 chrono = "0.4.6"
 rbtc = { path = "../rbtc" }
 rand = "0.6"
+sm = "0.7.0"
 
 [dependencies.rusqlite]
 version = "0.16.0"

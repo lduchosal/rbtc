@@ -48,13 +48,13 @@ pub enum Error {
 
     MessageMagic,
     MessageMagicReverse,
-    MessagePayload,
 
     PingNonce,
     PongNonce,
 
     Payload,
     PayloadLen,
+    PayloadData,
     PayloadTooSmall,
     PayloadChecksum,
     PayloadChecksumData,
