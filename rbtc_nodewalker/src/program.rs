@@ -1,6 +1,7 @@
 use crate::resolver;
 use crate::provider;
 use crate::walker;
+use crate::fsm::WalkerSmEvents;
 
 use std::{thread, time};
 
