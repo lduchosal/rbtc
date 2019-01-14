@@ -10,6 +10,7 @@ use crate::network::alert;
 use crate::network::addr;
 use crate::network::ping;
 use crate::network::pong;
+use crate::network::inv;
 
 use sha2::{Sha256, Digest};
 
@@ -199,6 +200,7 @@ pub enum Payload {
     Addr(addr::Addr),
     Ping(ping::Ping),
     Pong(pong::Pong),
+    Inv(inv::Inv),
 }
 
 impl Payload {
@@ -218,6 +220,7 @@ impl Payload {
             Payload::Addr(_) => Command::Addr,
             Payload::Ping(_) => Command::Ping,
             Payload::Pong(_) => Command::Pong,
+            Payload::Inv(_) => Command::Inv,
         }
     }
 
@@ -227,6 +230,7 @@ impl Decodable for Payload {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Payload, Error> {
 
         let commandstring = CommandString::decode(r).map_err(|_| Error::PayloadCommandString)?;
+        println!("Payload.decode [commandstring : {:?}]", commandstring);
         let payload_len = u32::decode(r).map_err(|_| Error::PayloadLen)?;
         let reader_len = r.get_ref().len();
         
@@ -247,10 +251,7 @@ impl Decodable for Payload {
         }
         let mut c = Cursor::new(&buffer);
 
-        let command = commandstring.to_command().map_err(|_| {
-            println!("Payload.decode [commandstring : {:?}]", commandstring);
-            Error::CommandFromStr
-        })?;
+        let command = commandstring.to_command().map_err(|_| Error::CommandFromStr)?;
         let payload = match command {
             Command::Version => {
                 let message = version::Version::decode(&mut c)?;
@@ -284,6 +285,10 @@ impl Decodable for Payload {
                 let message = pong::Pong::decode(&mut c)?;
                 Payload::Pong(message)
             },
+            Command::Inv => {
+                let message = inv::Inv::decode(&mut c)?;
+                Payload::Inv(message)
+            },
         };
         Ok(payload)
     }
@@ -305,6 +310,7 @@ impl Encodable for Payload {
             Payload::Addr(ref dat) => dat.encode(&mut buffer),
             Payload::Ping(ref dat) => dat.encode(&mut buffer),
             Payload::Pong(ref dat) => dat.encode(&mut buffer),
+            Payload::Inv(ref dat) => dat.encode(&mut buffer),
         }?;
         let payload_len = buffer.len() as u32;
         

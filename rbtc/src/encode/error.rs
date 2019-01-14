@@ -146,5 +146,8 @@ pub enum Error {
     AlertLen,
     AlertMessage,
 
+    InvLen,
+    InvMessage,
+
     AddrCount,
 }

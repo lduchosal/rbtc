@@ -20,6 +20,7 @@ pub enum Command {
     Addr,
     Ping,
     Pong,
+    Inv,
 }
 
 impl FromStr for Command {
@@ -34,6 +35,7 @@ impl FromStr for Command {
             "addr" => Ok(Command::Addr),
             "ping" => Ok(Command::Ping),
             "pong" => Ok(Command::Pong),
+            "inv" => Ok(Command::Inv),
             _ => Err(())
         }
     }
@@ -50,6 +52,7 @@ impl ToString for Command {
             Command::Addr => "addr",
             Command::Ping => "ping",
             Command::Pong => "pong",
+            Command::Inv => "inv",
         }.to_owned()
     }
 }

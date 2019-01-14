@@ -9,3 +9,4 @@ pub mod alert;
 pub mod addr;
 pub mod ping;
 pub mod pong;
+pub mod inv;

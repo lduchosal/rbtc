@@ -263,7 +263,7 @@ impl NodeWalker {
 
         println!("receive_decode_loop");
 
-        let loop_max = 15;
+        let loop_max = 20;
         let mut loop_count = 0;
         
         let error_max = 5;
@@ -273,7 +273,7 @@ impl NodeWalker {
         println!("receive_decode_loop [error_max: {}]", error_max);
 
         while loop_count <= loop_max
-            && error_count <= error_max
+              && error_count <= error_max
         {
             loop_count = loop_count + 1;
 
@@ -285,7 +285,10 @@ impl NodeWalker {
                     error_count = error_count + 1;
                     continue
                 },
-                ReceiveResult::ReadEmpty => continue,
+                ReceiveResult::ReadEmpty => {
+                    error_count = error_count + 1;
+                    continue
+                },
                 ReceiveResult::ReadSome => {
                     // dont break nor continue, try decode below
                 }, 
