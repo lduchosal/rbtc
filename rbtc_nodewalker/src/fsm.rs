@@ -13,19 +13,21 @@ use self::WalkerSm::*;
 
 pub(crate) trait WalkerSmEvents {
     fn run(&mut self) ;
-    fn on_initial_init(&mut self, m: Machine<Init, NoneEvent>) -> Variant ;
-    fn on_init_by_connect_failed(&mut self, m: Machine<Init, ConnectFailed>) -> Variant ;
-    fn on_connect_by_connect_socket(&mut self, m: Machine<Connect, ConnectSocket>) -> Variant ;
-    fn on_version_sent_by_send_version(&mut self, m: Machine<VersionSent, SendVersion>) -> Variant ;
-    fn on_version_received_by_receive_version(&mut self, m: Machine<VersionReceived, ReceiveVersion>) -> Variant ;
-    fn on_verack_received_by_receive_verack(&mut self, m: Machine<VerackReceived, ReceiveVerack>) -> Variant ;
-    fn on_verack_sent_by_send_verack(&mut self, m: Machine<VerackSent, SendVerack>) -> Variant ;
-    fn on_handshake_by_set_version(&mut self, m: Machine<Handshake, SetVersion>) -> Variant ;
-    fn on_handshake_by_receive_other(&mut self, m: Machine<Handshake, ReceiveOther>) -> Variant ;
-    fn on_handshake_by_send_getaddr_failed(&mut self, m: Machine<Handshake, SendGetAddrFailed>) -> Variant ;
-    fn on_get_addr_by_send_getaddr(&mut self, m: Machine<GetAddr, SendGetAddr>) -> Variant ;
-    fn on_addr_by_receive_addr(&mut self, m: Machine<Addr, ReceiveAddr>);
+    fn on_initial_init(&mut self, m: Machine<Init, NoneEvent>) -> Variant;
+    fn on_init_by_connect_failed(&mut self, m: Machine<Init, ConnectFailed>) -> Variant;
+    fn on_connect_by_connect_socket(&mut self, m: Machine<Connect, ConnectSocket>) -> Variant;
+    fn on_version_sent_by_send_version(&mut self, m: Machine<VersionSent, SendVersion>) -> Variant;
+    fn on_version_received_by_receive_version(&mut self, m: Machine<VersionReceived, ReceiveVersion>) -> Variant;
+    fn on_verack_received_by_receive_verack(&mut self, m: Machine<VerackReceived, ReceiveVerack>) -> Variant;
+    fn on_verack_sent_by_send_verack(&mut self, m: Machine<VerackSent, SendVerack>) -> Variant;
+    fn on_handshake_by_set_version(&mut self, m: Machine<Handshake, SetVersion>) -> Variant;
+    fn on_handshake_by_receive_other(&mut self, m: Machine<Handshake, ReceiveOther>) -> Variant;
+    fn on_handshake_by_send_getaddr_failed(&mut self, m: Machine<Handshake, SendGetAddrFailed>) -> Variant;
+    fn on_get_addr_by_send_getaddr(&mut self, m: Machine<GetAddr, SendGetAddr>) -> Variant;
+    fn on_addr_by_receive_addr(&mut self, m: Machine<Addr, ReceiveAddr>) -> Variant;
+
     fn on_end_by_parse_addr_failed(&self, m: Machine<End, ParseAddrFailed>);
+    fn on_end_by_parse_addr(&self, m: Machine<End, ParseAddr>);
     fn on_end_by_retry_failed(&self, m: Machine<End, RetryFailed>);
     fn on_end_by_send_version_failed(&self, m: Machine<End, SendVersionFailed>);
     fn on_end_by_receive_version_failed(&self, m: Machine<End, ReceiveVersionFailed>);
@@ -62,7 +64,8 @@ impl WalkerSmEvents for NodeWalker  {
                 HandshakeByReceiveOther(m) => self.on_handshake_by_receive_other(m),
                 HandshakeBySendGetAddrFailed (m) => self.on_handshake_by_send_getaddr_failed(m),
                 GetAddrBySendGetAddr(m) => self.on_get_addr_by_send_getaddr(m),
-                AddrByReceiveAddr(m) => { self.on_addr_by_receive_addr(m); break; },
+                AddrByReceiveAddr(m) => self.on_addr_by_receive_addr(m),
+
                 EndByParseAddrFailed(m) => { self.on_end_by_parse_addr_failed(m); break; },
                 EndByRetryFailed(m) => { self.on_end_by_retry_failed(m); break; },
                 EndBySendVersionFailed(m) => { self.on_end_by_send_version_failed(m); break; },
@@ -70,6 +73,7 @@ impl WalkerSmEvents for NodeWalker  {
                 EndByReceiveVerackFailed(m) => { self.on_end_by_receive_verack_failed(m); break; },
                 EndBySendVerackFailed(m) => { self.on_end_by_send_verack_failed(m); break; },
                 EndBySendGetAddrRetryFailed(m) => { self.on_end_by_send_get_addr_retry_failed(m); break; },
+                EndByParseAddr(m) => { self.on_end_by_parse_addr(m); break; },
             };
         }
     }
@@ -177,11 +181,11 @@ impl WalkerSmEvents for NodeWalker  {
         }
     }
 
-    fn on_addr_by_receive_addr(&mut self, _m: Machine<Addr, ReceiveAddr>) {
+    fn on_addr_by_receive_addr(&mut self, m: Machine<Addr, ReceiveAddr>) -> Variant {
 
         println!("on_addr_by_receive_addr");
         self.parse_addr();
-        self.end();
+        m.transition(ParseAddr).as_enum()
     }
 
     fn on_end_by_parse_addr_failed(&self, _m: Machine<End, ParseAddrFailed>) {
@@ -222,7 +226,13 @@ impl WalkerSmEvents for NodeWalker  {
 
     fn on_end_by_send_get_addr_retry_failed(&self, _m: Machine<End, SendGetAddrRetryFailed>) {
 
-        println!("on_end_by_send_verack_failed");
+        println!("on_end_by_send_get_addr_retry_failed");
+        self.end();
+    }
+
+    fn on_end_by_parse_addr(&self, _m: Machine<End, ParseAddr>) {
+
+        println!("on_end_by_parse_addr");
         self.end();
     }
 }
@@ -257,6 +267,8 @@ sm! {
 
         ReceiveAddr { GetAddr => Addr }
         ReceiveOther { Handshake, GetAddr => Handshake }
+
+        ParseAddr { Addr => End }
 
     }
 }

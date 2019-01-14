@@ -1,0 +1,39 @@
+digraph G {
+
+    splines="FALSE";
+
+    InitialStates -> Init [ label="InitialStates" ]; 
+    Init
+    Init -> End  [ label="ParseAddrFailed" ]; 
+    Init -> End  [ label="RetryFailed" ];
+    Init -> Connect  [ label="ConnectSocket" ];
+    Init -> Init  [ label="ConnectFailed" ];
+    
+    Connect -> VersionSent  [ label="SendVersion" ]; 
+    Connect -> End  [ label="SendVersionFailed" ]; 
+    
+    VersionSent -> VersionReceived  [ label="ReceiveVersion" ]; 
+    VersionSent -> End  [ label="ReceiveVersionFailed" ]; 
+    
+    VersionReceived -> VerackReceived  [ label="ReceiveVerack" ]; 
+    VersionReceived -> End [ label="ReceiveVerackFailed" ]; 
+    
+    VerackReceived -> VerackSent  [ label="SendVerack" ]; 
+    VerackReceived -> End  [ label="SendVerackFailed" ]; 
+    
+    VerackSent -> Handshake  [ label="SetVersion" ]; 
+    
+    Handshake -> GetAddr  [ label="SendGetAddr" ]; 
+    Handshake -> Handshake  [ label="SendGetAddrFailed" ]; 
+    Handshake -> End  [ label="SendGetAddrRetryFailed" ]; 
+    
+    GetAddr -> Addr  [ label="ReceiveAddr" ]; 
+    Handshake -> Handshake  [ label="ReceiveOther" ]; 
+    GetAddr -> Handshake  [ label="ReceiveOther" ]; 
+    
+    Addr -> End  [ label="ParseAddr" ]; 
+
+
+
+
+}

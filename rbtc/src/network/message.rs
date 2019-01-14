@@ -247,7 +247,10 @@ impl Decodable for Payload {
         }
         let mut c = Cursor::new(&buffer);
 
-        let command = commandstring.to_command().map_err(|_| Error::CommandFromStr)?;
+        let command = commandstring.to_command().map_err(|_| {
+            println!("Payload.decode [commandstring : {:?}]", commandstring);
+            Error::CommandFromStr
+        })?;
         let payload = match command {
             Command::Version => {
                 let message = version::Version::decode(&mut c)?;

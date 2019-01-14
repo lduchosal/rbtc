@@ -1,7 +1,6 @@
 extern crate rand;
 
 use crate::message::MessageProvider;
-use crate::fsm;
 
 use rbtc::network::message::Message;
 use rbtc::network::message::Payload;
@@ -247,11 +246,13 @@ impl NodeWalker {
 
             Err(err) => {
 
-                println!("decode [{:?}]", err);
-
+                println!("decode [err: {:?}]", err);
                 match err {
-                    Error::PayloadData => DecodeResult::NeedMoreData,
+                    Error::PayloadCommandString => DecodeResult::NeedMoreData,
                     Error::PayloadLen => DecodeResult::NeedMoreData,
+                    Error::PayloadTooSmall => DecodeResult::NeedMoreData,
+                    Error::PayloadChecksum => DecodeResult::NeedMoreData,
+                    Error::PayloadData => DecodeResult::NeedMoreData,
                     _ => DecodeResult::DecodeFailed,
                 }
             }
@@ -260,22 +261,34 @@ impl NodeWalker {
 
     fn receive_decode_loop(&mut self) {
 
-        println!("receive_loop");
+        println!("receive_decode_loop");
 
-        let maxloop = 5;
-        let mut count = 0;
+        let loop_max = 15;
+        let mut loop_count = 0;
+        
+        let error_max = 5;
+        let mut error_count = 0;
 
-        println!("receive_loop [maxloop: {}]", maxloop);
+        println!("receive_decode_loop [loop_max: {}]", loop_max);
+        println!("receive_decode_loop [error_max: {}]", error_max);
 
-        while count <= maxloop {
-            count = count + 1;
+        while loop_count <= loop_max
+            && error_count <= error_max
+        {
+            loop_count = loop_count + 1;
 
-            println!("receive_loop [count: {}]", count);
+            println!("receive_decode_loop [loop_count: {}]", loop_count);
+            println!("receive_decode_loop [error_count: {}]", error_count);
 
             match self.receive() {
-                ReceiveResult::ReadFailed => continue,
+                ReceiveResult::ReadFailed => {
+                    error_count = error_count + 1;
+                    continue
+                },
                 ReceiveResult::ReadEmpty => continue,
-                _ => {},
+                ReceiveResult::ReadSome => {
+                    // dont break nor continue, try decode below
+                }, 
             };
 
             match self.decode() {
@@ -296,9 +309,9 @@ impl NodeWalker {
         let mut buffer = [0u8; 8192];
         let mut _read : usize = 0;
 
-        loop {
+        println!("receive [buffer: {}]", buffer.len());
 
-            println!("receive [buffer: {}]", buffer.len());
+        loop {
 
             match stream.read(&mut buffer) {
                 Ok(bytes) => _read = bytes,
@@ -388,7 +401,7 @@ impl NodeWalker {
     }
 
     pub(crate) fn end(&self) {
-
+        println!("end");
     }
 }
 
