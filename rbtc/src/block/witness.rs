@@ -13,6 +13,8 @@ pub struct Witness {
 impl Decodable for Vec<Witness> {
         
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Witness>, Error> {
+        
+        trace!("decode");
 
         let mut result: Vec<Witness> = Vec::new();
         let count = VarInt::decode(r).map_err(|_| Error::WitnessesCount)?;
@@ -28,6 +30,8 @@ impl Decodable for Vec<Witness> {
 impl Decodable for Witness {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Witness, Error> {
+
+        trace!("decode");
 
         let varlen = VarInt::decode(r).map_err(|_| Error::WitnessLen)?;
         let mut data = vec![0u8; varlen.0 as usize];

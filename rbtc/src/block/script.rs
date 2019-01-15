@@ -11,6 +11,8 @@ pub struct Script {
 impl Decodable for Script {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Script, Error> {
 
+        trace!("decode");
+
         let content = <Vec<u8>>::decode(r).map_err(|_| Error::Script)?;
         let result = Script {
             content: content

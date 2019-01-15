@@ -1,4 +1,8 @@
 extern crate chrono;
+extern crate rayon;
+extern crate rand;
+extern crate pretty_env_logger;
+#[macro_use] extern crate log;
 
 pub mod config;
 pub mod resolver;
@@ -13,7 +17,9 @@ use std::path::Path;
 
 fn main() {
 
-    println!("rbtc_nodewalker 0.2.0 (q)");
+    pretty_env_logger::init();
+
+    info!("rbtc_nodewalker 0.3.0 (q)");
 
     let config = config::Config {
         dns_seeds: vec![

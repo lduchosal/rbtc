@@ -28,6 +28,7 @@ pub struct Ping {
 impl Encodable for Ping {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
+        trace!("encode");
         self.nonce.encode(w).map_err(|_| Error::PingNonce)?;
         Ok(())
     }
@@ -36,6 +37,7 @@ impl Encodable for Ping {
 impl Decodable for Ping {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Ping, Error> {
+        trace!("decode");
         let nonce = u64::decode(r).map_err(|_| Error::PingNonce)?;
         let result = Ping {
             nonce: nonce

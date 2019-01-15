@@ -74,6 +74,8 @@ impl Decodable for Transaction {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Transaction, Error> {
 
+        trace!("decode");
+
         let version = i32::decode(r).map_err(|_| Error::TransactionVersion)?;
 
         let position = r.position();
@@ -111,6 +113,8 @@ impl Decodable for Transaction {
 impl Decodable for Transactions {
     
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Transactions, Error> {
+        
+        trace!("decode");
 
         let mut txs : Vec<Transaction> = Vec::new();
         let count = VarInt::decode(r).map_err(|_| Error::TransactionsCount)?;

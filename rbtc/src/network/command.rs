@@ -26,6 +26,7 @@ pub enum Command {
 impl FromStr for Command {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, ()> {
+        trace!("from_str");
          match s {
             "version" => Ok(Command::Version),
             "getheaders" => Ok(Command::GetHeaders),
@@ -43,6 +44,7 @@ impl FromStr for Command {
 
 impl ToString for Command {
     fn to_string(&self) -> String {
+        trace!("to_string");
         match self {
             Command::Version => "version",
             Command::GetHeaders => "getheaders",
@@ -59,6 +61,7 @@ impl ToString for Command {
 
 impl CommandString {
     pub fn to_command(&self) -> Result<Command, ()> {
+        trace!("to_command");
         Command::from_str(self.0.as_ref())
     }
 }
@@ -67,6 +70,7 @@ impl Encodable for CommandString {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
+        trace!("encode");
         let mut command = format!("{:}\0\0\0\0\0\0\0\0\0\0\0\0", self.0)
             .to_lowercase();
         command.truncate(12);
@@ -80,6 +84,7 @@ impl Decodable for CommandString {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<CommandString, Error> {
         
+        trace!("decode");
         let buffer = <[u8; 12]>::decode(r).map_err(|_| Error::Command)?;
         let mut s = String::from_utf8(buffer.to_vec()).map_err(|_| Error::CommandDecode)?;
         s.retain(|c| c != (0 as char));

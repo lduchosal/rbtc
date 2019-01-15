@@ -154,6 +154,7 @@ impl Decodable for Vec<Message> {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<Message>, Error> {
 
+        trace!("decode");
         let len = (*r.get_ref()).len();
         if len == 0{
             return Err(Error::MessageEmpty);
@@ -182,6 +183,7 @@ impl Decodable for Vec<Message> {
 impl Encodable for Vec<Message> {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
+        trace!("encode");
         for message in self {
             message.encode(w)?;
         }
@@ -229,12 +231,14 @@ impl Decodable for Payload {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Payload, Error> {
 
+        trace!("decode");
         let commandstring = CommandString::decode(r).map_err(|_| Error::PayloadCommandString)?;
-        println!("Payload.decode [commandstring : {:?}]", commandstring);
+        debug!("decode [commandstring : {:?}]", commandstring);
         let payload_len = u32::decode(r).map_err(|_| Error::PayloadLen)?;
         let reader_len = r.get_ref().len();
-        
-        println!("Payload.decode [payload_len : {:?}, reraderlen : {}]", payload_len, reader_len);
+        debug!("decode [payload_len : {:?}]", payload_len);
+        debug!("decode [reraderlen : {}]", reader_len);
+
         if reader_len < payload_len as usize {
             return Err(Error::PayloadTooSmall);
         }

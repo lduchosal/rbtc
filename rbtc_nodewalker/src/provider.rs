@@ -32,6 +32,8 @@ impl NodeProvider {
 
     pub fn new(path: &Path) ->  Result<NodeProvider, ProviderError> {
 
+        trace!("new");
+
         let conn = Connection::open(path).unwrap();
         let provider = NodeProvider {
             conn: conn,
@@ -43,6 +45,8 @@ impl NodeProvider {
     }
 
     fn init(&self) -> Result<usize, ProviderError> {
+
+        trace!("init");
 
         self.conn.execute("
             CREATE TABLE IF NOT EXISTS node (
@@ -58,6 +62,8 @@ impl NodeProvider {
 
     pub fn insert(&self, n: &Node) -> Result<usize, ProviderError> {
 
+        trace!("insert");
+
         self.conn.execute(
             "INSERT OR IGNORE INTO node (ip, src, creation) VALUES (?1, ?2, ?3)",
             &[ 
@@ -71,6 +77,8 @@ impl NodeProvider {
 
     pub fn bulkinsert(&self, ips: Vec<String>, src: &String) -> Result<(), ProviderError> {
         
+        trace!("bulkinsert");
+
         let now = chrono::Local::now();
         for ip in ips {
             let node = Node {
@@ -84,13 +92,49 @@ impl NodeProvider {
 
         Ok(())
     }
+    
     pub fn all(&self) -> Result<Vec<Node>, ProviderError> {
+
+        trace!("all");
 
         let mut stmt = self.conn
             .prepare("
             SELECT id, ip, src, creation 
               FROM node
               ;
+              ")
+            .unwrap()
+            ;
+
+        let iter = stmt
+            .query_map(NO_PARAMS, |row| Node {
+                id: row.get(0),
+                ip: row.get(1),
+                src: row.get(2),
+                creation: row.get(3)
+            })
+            .map_err(|_| ProviderError::Select)?;
+
+        let mut result : Vec<Node> = Vec::new();
+        for item in iter {
+            let node = item.map_err(|_| ProviderError::SelectIterator)?;
+            result.push(node);
+        }
+
+        Ok(result)
+    }
+
+
+    pub fn ten(&self) -> Result<Vec<Node>, ProviderError> {
+
+        trace!("ten");
+
+        let mut stmt = self.conn
+            .prepare("
+            SELECT  id, ip, src, creation 
+              FROM node
+              ORDER BY id DESC
+              LIMIT 10;
               ")
             .unwrap()
             ;
@@ -112,4 +156,5 @@ impl NodeProvider {
 
         Ok(result)
     }
+
 }

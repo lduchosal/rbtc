@@ -91,6 +91,7 @@ bitflags! {
 
 impl Encodable for Service {
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
+        trace!("encode");
         self.bits().encode(w).map_err(|_| Error::Service)?;
         Ok(())
     }
@@ -98,6 +99,7 @@ impl Encodable for Service {
 
 impl Decodable for Service {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Service, Error> {
+        trace!("decode");
         let value = u64::decode(r).map_err(|_| Error::Service)?;
         let flag = Service::from_bits(value);
         match flag {
@@ -117,6 +119,7 @@ impl Encodable for Version {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
+        trace!("encode");
         self.version.encode(w).map_err(|_| Error::VersionVersion)?;
         self.services.encode(w).map_err(|_| Error::VersionServices)?;
         self.timestamp.encode(w).map_err(|_| Error::VersionTimestamp)?;
@@ -142,6 +145,7 @@ impl Decodable for Version {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Version, Error> {
 
+        trace!("decode");
         let version = i32::decode(r).map_err(|_| Error::VersionVersion)?;
         let services = Service::decode(r).map_err(|_| Error::VersionServices)?;
         let timestamp = i64::decode(r).map_err(|_| Error::VersionTimestamp)?;

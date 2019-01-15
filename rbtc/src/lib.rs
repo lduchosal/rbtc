@@ -5,6 +5,9 @@ extern crate hex;
 extern crate chrono;
 
 #[macro_use]
+extern crate log;
+
+#[macro_use]
 extern crate bitflags;
 
 pub mod network;

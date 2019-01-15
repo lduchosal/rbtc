@@ -20,6 +20,8 @@ pub struct TxOut {
 impl Decodable for Vec<TxOut> {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxOut>, Error> {
+        
+        trace!("decode");
 
         let mut result : Vec<TxOut> = Vec::new();
         let count = VarInt::decode(r).map_err(|_| Error::OutputsCount)?;
@@ -36,6 +38,8 @@ impl Decodable for Vec<TxOut> {
 impl Decodable for TxOut {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxOut, Error> {
+        
+        trace!("decode");
 
         let amount = u64::decode(r).map_err(|_| Error::TxOutAmount)?;
         let script_pubkey = Script::decode(r).map_err(|_| Error::ScriptPubKey)?;

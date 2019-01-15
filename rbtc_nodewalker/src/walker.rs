@@ -1,4 +1,3 @@
-extern crate rand;
 
 use crate::message::MessageProvider;
 
@@ -10,6 +9,7 @@ use rbtc::encode::encode::{Encodable, Decodable};
 use std::net::{TcpStream, SocketAddr};
 use std::io::prelude::*;
 use std::io::{Cursor};
+
 
 pub struct NodeWalker {
     node_ip_port: String,
@@ -53,7 +53,7 @@ impl NodeWalker {
 
     pub(crate) fn init_connect_retry(&mut self) -> InitConnectResult  {
 
-        println!("init_connect_retry");
+        trace!("init_connect_retry");
 
         match self.init() {
             InitResult::ParseAddrFailed => InitConnectResult::ParseAddrFailed,
@@ -69,13 +69,13 @@ impl NodeWalker {
 
     pub(crate) fn connect_retry(&mut self) -> ConnectRetryResult {
 
-        println!("connect_retry");
+        trace!("connect_retry");
 
         let retry  = self.connect_retry;
         let maxretry = 1;
 
-        println!("connect_retry [retry: {}]", retry);
-        println!("connect_retry [maxretry: {}]", maxretry);
+        debug!("connect_retry [retry: {}]", retry);
+        debug!("connect_retry [maxretry: {}]", maxretry);
 
         self.connect_retry = self.connect_retry + 1;
         if retry >= maxretry {
@@ -90,8 +90,8 @@ impl NodeWalker {
 
     pub(crate) fn init(&mut self) -> InitResult {
 
-        println!("init");
-        println!("init [node_ip_port: {}]", self.node_ip_port);
+        trace!("init");
+        debug!("init [node_ip_port: {}]", self.node_ip_port);
 
         match self.node_ip_port.parse() {
             Ok(addr) => {
@@ -99,7 +99,7 @@ impl NodeWalker {
                 InitResult::Succeed
             },
             Err(err) => {
-                println!("init failed [err: {}]", err);
+                warn!("init parse [err: {}]", err);
                 InitResult::ParseAddrFailed
             }
         }
@@ -107,7 +107,7 @@ impl NodeWalker {
 
     pub(crate) fn connect(&mut self) -> ConnectResult {
 
-        println!("connect");
+        trace!("connect");
 
         let addr = self.addr.unwrap();
 
@@ -115,22 +115,22 @@ impl NodeWalker {
         let read_timeout = std::time::Duration::from_secs(3);
         let write_timeout = std::time::Duration::from_secs(3);
 
-        println!("connect [connect_timeout: {:?}]", connect_timeout);
-        println!("connect [read_timeout: {:?}]", read_timeout);
-        println!("connect [write_timeout: {:?}]", write_timeout);
+        debug!("connect [connect_timeout: {:?}]", connect_timeout);
+        debug!("connect [read_timeout: {:?}]", read_timeout);
+        debug!("connect [write_timeout: {:?}]", write_timeout);
 
         match TcpStream::connect_timeout(&addr, connect_timeout) {
             Err(err) => {
-                println!("connect failed [err: {}]", err);
+                debug!("connect failed [err: {}]", err);
                 self.stream = None;
                 ConnectResult::ConnectFailed
             },
             Ok(stream) => {
                 if let Err(err) = stream.set_read_timeout(Option::Some(read_timeout)) {
-                    println!("connect set_read_timeout [err: {}]", err);
+                    warn!("connect set_read_timeout [err: {}]", err);
                 };
                 if let Err(err) = stream.set_write_timeout(Option::Some(write_timeout)) {
-                    println!("connect set_write_timeout [err: {}]", err);
+                    warn!("connect set_write_timeout [err: {}]", err);
                 };
                 self.stream = Some(stream);
                 ConnectResult::Succeed
@@ -140,7 +140,8 @@ impl NodeWalker {
 
     pub(crate) fn send_version(&mut self) -> SendMessageResult {
 
-        println!("send_version");
+        trace!("send_version");
+        
         let messages = MessageProvider::version();
         match self.send(messages) {
             SendResult::Succeed => SendMessageResult::Succeed,
@@ -150,18 +151,18 @@ impl NodeWalker {
 
     fn send(&mut self, messages: Vec<Message>) -> SendResult {
 
-        println!("send");
+        trace!("send");
 
         let mut stream = self.stream.as_ref().unwrap();
         let mut request : Vec<u8> = Vec::new();
 
         if let Err(err) = messages.encode(&mut request) {
-            println!("send messages.encode [err: {:?}]", err);
+            debug!("send messages.encode [err: {:?}]", err);
             return SendResult::EncodeFailed;
         }
 
         if let Err(err) = stream.write(&request) {
-            println!("send stream.write [err: {:?}]", err);
+            debug!("send stream.write [err: {:?}]", err);
             return SendResult::WriteFailed;
         }
         
@@ -170,7 +171,7 @@ impl NodeWalker {
 
     pub(crate) fn receive_version(&mut self) -> ReceiveMessageResult {
 
-        println!("receive_version");
+        trace!("receive_version");
 
         self.receive_message(|payload| {
             match payload {
@@ -182,7 +183,7 @@ impl NodeWalker {
 
     fn receive_message(&mut self, match_payload: impl Fn(&Payload) -> bool) -> ReceiveMessageResult{
 
-        println!("receive_message");
+        trace!("receive_message");
 
         let messages = &self.messages;
         for message in messages {
@@ -205,7 +206,7 @@ impl NodeWalker {
 
     pub(crate) fn receive_verack(&mut self) -> ReceiveMessageResult {
 
-        println!("receive_verack");
+        trace!("receive_verack");
 
         self.receive_message(|payload| {
             match payload {
@@ -217,7 +218,7 @@ impl NodeWalker {
 
     pub(crate) fn receive_addr(&mut self) -> ReceiveMessageResult {
 
-        println!("receive_addr");
+        trace!("receive_addr");
 
         self.receive_message(|payload| {
             match payload {
@@ -230,7 +231,7 @@ impl NodeWalker {
 
     fn decode(&mut self) -> DecodeResult {
 
-        println!("decode");
+        trace!("decode");
 
         let response = &self.response;
         let result = &mut self.messages;
@@ -246,7 +247,7 @@ impl NodeWalker {
 
             Err(err) => {
 
-                println!("decode [err: {:?}]", err);
+                debug!("decode [err: {:?}]", err);
                 match err {
                     Error::PayloadCommandString => DecodeResult::NeedMoreData,
                     Error::PayloadLen => DecodeResult::NeedMoreData,
@@ -261,7 +262,7 @@ impl NodeWalker {
 
     fn receive_decode_loop(&mut self) {
 
-        println!("receive_decode_loop");
+        trace!("receive_decode_loop");
 
         let loop_max = 20;
         let mut loop_count = 0;
@@ -269,16 +270,16 @@ impl NodeWalker {
         let error_max = 5;
         let mut error_count = 0;
 
-        println!("receive_decode_loop [loop_max: {}]", loop_max);
-        println!("receive_decode_loop [error_max: {}]", error_max);
+        debug!("receive_decode_loop [loop_max: {}]", loop_max);
+        debug!("receive_decode_loop [error_max: {}]", error_max);
 
         while loop_count <= loop_max
               && error_count <= error_max
         {
             loop_count = loop_count + 1;
 
-            println!("receive_decode_loop [loop_count: {}]", loop_count);
-            println!("receive_decode_loop [error_count: {}]", error_count);
+            debug!("receive_decode_loop [loop_count: {}]", loop_count);
+            debug!("receive_decode_loop [error_count: {}]", error_count);
 
             match self.receive() {
                 ReceiveResult::ReadFailed => {
@@ -304,7 +305,7 @@ impl NodeWalker {
 
     fn receive(&mut self) -> ReceiveResult {
 
-        println!("receive");
+        trace!("receive");
 
         let mut stream = self.stream.as_ref().unwrap();
         let response = &mut self.response;
@@ -312,19 +313,19 @@ impl NodeWalker {
         let mut buffer = [0u8; 8192];
         let mut _read : usize = 0;
 
-        println!("receive [buffer: {}]", buffer.len());
+        debug!("receive [buffer: {}]", buffer.len());
 
         loop {
 
             match stream.read(&mut buffer) {
                 Ok(bytes) => _read = bytes,
                 Err(err) => {
-                    println!("receive stream.read [err: {:?}]", err);
+                    debug!("receive stream.read [err: {:?}]", err);
                     return ReceiveResult::ReadFailed;
                 }
             };
 
-            println!("receive [read: {}]", _read);
+            debug!("receive [read: {}]", _read);
             if _read == 0 {
                 return ReceiveResult::ReadEmpty;
             }
@@ -344,7 +345,7 @@ impl NodeWalker {
 
     pub(crate) fn send_verack(&mut self) -> SendMessageResult {
 
-        println!("send_verack");
+        trace!("send_verack");
 
         let messages = MessageProvider::verack();
         match self.send(messages) {
@@ -355,7 +356,7 @@ impl NodeWalker {
 
     fn send_getaddr(&mut self) -> SendMessageResult {
 
-        println!("send_getaddr");
+        trace!("send_getaddr");
 
         let messages = MessageProvider::getaddr();
         match self.send(messages) {
@@ -366,13 +367,13 @@ impl NodeWalker {
 
     pub(crate) fn send_getaddr_retry(&mut self) -> SendGetAddrRetryResult {
 
-        println!("send_getaddr_retry");
+        trace!("send_getaddr_retry");
 
         let retry  = self.getaddr_retry;
         let maxretry = 2;
 
-        println!("send_getaddr_retry [retry: {}]", retry);
-        println!("send_getaddr_retry [maxretry: {}]", maxretry);
+        debug!("send_getaddr_retry [retry: {}]", retry);
+        debug!("send_getaddr_retry [maxretry: {}]", maxretry);
 
         self.getaddr_retry = self.getaddr_retry + 1;
         if retry >= maxretry {
@@ -386,12 +387,12 @@ impl NodeWalker {
     }
 
     pub(crate) fn set_version(&self) {
-        println!("set_version");
+        trace!("set_version");
     }
 
     pub(crate) fn parse_addr(&mut self) {
 
-        println!("parse_addr");
+        trace!("parse_addr");
         let result = &mut self.ips;
         for message in &self.messages {
             if let Payload::Addr(addr) = &message.payload {
@@ -404,7 +405,7 @@ impl NodeWalker {
     }
 
     pub(crate) fn end(&self) {
-        println!("end");
+        trace!("end");
     }
 }
 

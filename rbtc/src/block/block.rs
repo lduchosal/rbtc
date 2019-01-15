@@ -85,6 +85,8 @@ impl Block {
 
     pub fn parse(hex: &Vec<u8>) -> Result<Block, Error> {
 
+        trace!("parse");
+
         if hex.len() < 81 { // might not be true
             return Err(Error::InvalidLength);
         }
@@ -101,6 +103,8 @@ impl Block {
 impl Decodable for Block {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Block, Error> {
+
+        trace!("decode");
 
         let version = u32::decode(r).map_err(|_| Error::BlockVersion)?;
         let previous = <[u8; 32]>::decode(r).map_err(|_| Error::BlockPrevious)?;

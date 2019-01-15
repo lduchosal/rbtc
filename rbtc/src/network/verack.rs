@@ -33,6 +33,7 @@ pub struct VerAck {
 impl Encodable for VerAck {
 
     fn encode(&self, _: &mut Vec<u8>) -> Result<(), Error> {
+        trace!("encode");
         Ok(())
     }
 }
@@ -40,6 +41,7 @@ impl Encodable for VerAck {
 impl Decodable for VerAck {
 
     fn decode(_: &mut Cursor<&Vec<u8>>) -> Result<VerAck, Error> {
+        trace!("decode");
         Ok(VerAck {})
     }
 }

@@ -135,6 +135,7 @@ impl Encodable for Alert {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
+        trace!("encode");
         let varint = VarInt::new(self.data.len() as u64);
         varint.encode(w)?;
         self.data.encode(w)?;
@@ -146,6 +147,7 @@ impl Decodable for Alert {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Alert, Error> {
 
+        trace!("decode");
         let varlen = VarInt::decode(r).map_err(|_| Error::AlertLen)?;
         let mut data = vec![0u8; varlen.0 as usize];
         let mut data_ref = data.as_mut_slice();

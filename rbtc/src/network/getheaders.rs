@@ -51,6 +51,7 @@ impl Encodable for GetHeaders {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
+        trace!("encode");
         self.version.encode(w).map_err(|_| Error::GetHeadersVersion)?;
         self.locators.encode(w).map_err(|_| Error::GetHeadersLocators)?;
         self.stop.encode(w).map_err(|_| Error::GetHeadersStop)?;
@@ -62,6 +63,7 @@ impl Decodable for GetHeaders {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<GetHeaders, Error> {
 
+        trace!("decode");
         let version = u32::decode(r).map_err(|_| Error::GetHeadersVersion)?;
         let locators = <Vec<Sha256>>::decode(r).map_err(|_| Error::GetHeadersLocators)?;
         let stop = Sha256::decode(r).map_err(|_| Error::GetHeadersStop)?;

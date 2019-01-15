@@ -45,6 +45,7 @@ impl Decodable for VarInt {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<VarInt, Error> {
 
+        trace!("decode");
         let varlen = r.read_u8().map_err(|_| Error::VarInt)?;
         match varlen {
             0xFD => u16::decode(r).map(|v| VarInt::new(v as u64)).map_err(|_| Error::VarIntFD),
@@ -58,6 +59,8 @@ impl Encodable for VarInt {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
+        trace!("encode");
+        
         let size_enc : u8 = match self.0 {
             0...0xFC => self.0 as u8,
             0xFD...0xFFFF => 0xFD,

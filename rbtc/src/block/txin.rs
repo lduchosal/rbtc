@@ -35,6 +35,8 @@ impl Decodable for Vec<TxIn> {
     
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TxIn>, Error> {
 
+        trace!("decode");
+
         let mut result : Vec<TxIn> = Vec::new();
         let count = VarInt::decode(r).map_err(|_| Error::InputsCount)?;
         for _ in 0..count.0 {
@@ -49,6 +51,8 @@ impl Decodable for Vec<TxIn> {
 impl Decodable for TxIn {
     
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TxIn, Error> {
+        
+        trace!("decode");
 
         let previous = OutPoint::decode(r).map_err(|_| Error::TxInOutPoint)?;
         let signature = Script::decode(r).map_err(|_| Error::Signature)?;

@@ -63,6 +63,7 @@ pub struct Addr {
 impl Encodable for Addr {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
+        trace!("encode");
         self.addrs.encode(w)?;
         Ok(())
     }
@@ -71,6 +72,7 @@ impl Encodable for Addr {
 impl Decodable for Addr {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Addr, Error> {
+        trace!("decode");
         let addrs = <Vec<TimedNetworkAddr>>::decode(r)?;
         let result= Addr {
             addrs: addrs

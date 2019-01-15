@@ -25,6 +25,7 @@ pub struct GetAddr {
 impl Encodable for GetAddr {
 
     fn encode(&self, _: &mut Vec<u8>) -> Result<(), Error> {
+        trace!("encode");
         Ok(())
     }
 }
@@ -32,6 +33,7 @@ impl Encodable for GetAddr {
 impl Decodable for GetAddr {
 
     fn decode(_: &mut Cursor<&Vec<u8>>) -> Result<GetAddr, Error> {
+        trace!("decode");
         Ok(GetAddr {})
     }
 }

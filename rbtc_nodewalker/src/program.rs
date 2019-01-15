@@ -1,13 +1,26 @@
 use crate::resolver;
 use crate::provider;
 use crate::walker;
+use crate::node;
 use crate::fsm::WalkerSmEvents;
 
+use rayon::prelude::*;
+
 use std::{thread, time};
+use std::sync::Arc;
+use std::sync::mpsc::channel;
+use std::sync::mpsc::Sender;
+use std::sync::mpsc::Receiver;
+
 
 pub struct Program {
     resolver: resolver::Resolver,
     provider: provider::NodeProvider,
+}
+
+pub struct Comm {
+    node: node::Node,
+    sender: Sender<(String, Vec<String>)>
 }
 
 impl Program {
@@ -16,6 +29,9 @@ impl Program {
         resolver: resolver::Resolver,
         provider: provider::NodeProvider,
     ) -> Program {
+
+        trace!("new");
+
         Program {
             resolver: resolver,
             provider: provider,
@@ -23,6 +39,8 @@ impl Program {
     }
 
     pub fn run(&self) {
+
+        trace!("run");
 
         loop {
 
@@ -39,6 +57,8 @@ impl Program {
 
     fn seed(&self) {
 
+        trace!("seed");
+
         let ips = self.resolver.ips()
             .into_iter()
             .map(|ip| ip.to_string())
@@ -52,38 +72,61 @@ impl Program {
 
     fn report(&self) {
 
+        trace!("report");
+
         let nodes = self.provider.all().unwrap();
-        // for node in nodes {
-        //     println!("{} {} {}", node.id, node.src, node.ip);
-        // }
-        println!("Node capture : {}", nodes.len());
+        debug!("Node capture : {}", nodes.len());
 
         let now = chrono::Local::now();
-        println!("------------------------------", );
-        println!("{}", now.to_string());
-        println!("------------------------------", );
+        info!("------------------------------", );
+        info!("{}", now.to_string());
+        info!("------------------------------", );
 
     }
 
     fn walk(&self) {
 
-        let nodes = self.provider.all().unwrap();
-        for node in nodes {
+        trace!("walk");
 
-            let src = node.ip;
-            let mut walker = walker::NodeWalker::new(&src);
-            walker.run();
-            
-            let ips = walker.ips();
-            println!("NodeWalker got {} new ips from {}", ips.len(), src);
+        let (sender, receiver) : (Sender<(String, Vec<String>)>, Receiver<(String, Vec<String>)>)= channel();
+
+        let nodes = self.provider.ten()
+            .unwrap();
+
+        let comms : Vec<Comm> = nodes
+            .into_iter()
+            .map(|node| Comm {
+                node: node,
+                sender: sender.clone()
+            })
+            .collect();
+
+        comms.into_par_iter()
+            .for_each( |comm| {
+
+                let node = comm.node;
+                let sender = comm.sender;
+
+                let src = node.ip.clone();
+                info!("walk [src: {}]", src);
+                let mut walker = walker::NodeWalker::new(&src);
+                walker.run();
+                
+                let result = walker.ips();
+                info!("walk [result: {}]", result.len());
+                sender.send((src, result));
+
+            });
+
+        while let Ok((src, ips)) = receiver.recv() {
+                warn!("walk [rcv]");
+
             let inserted = self.provider.bulkinsert(ips, &src);
-
             if let Err(err) = inserted {
-                println!("NodeProvider failed with : {}", err);
-                continue;
+                warn!("walk [err: {}]", err);
             }
-
         }
+
     }
 
 }

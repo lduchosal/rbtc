@@ -65,6 +65,7 @@ impl Encodable for NetworkAddr {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
+        trace!("encode");
         self.services.encode(w).map_err(|_| Error::NetworkAddrServices)?;
         self.ip.encode(w).map_err(|_| Error::NetworkAddrIp)?;
         self.port.encode_network_byte_order(w).map_err(|_| Error::NetworkAddrPort)?;
@@ -75,6 +76,7 @@ impl Encodable for NetworkAddr {
 impl Encodable for TimedNetworkAddr {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
+        trace!("encode");
         self.time.encode(w).map_err(|_| Error::TimedNetworkAddrTime)?;
         self.addr.encode(w)?;
         Ok(())
@@ -86,6 +88,7 @@ impl Encodable for Vec<TimedNetworkAddr> {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
+        trace!("encode");
         let varint = VarInt::new(self.len() as u64);
         varint.encode(w).map_err(|_| Error::TimedNetworkCount)?;
         for addr in self {
@@ -100,6 +103,7 @@ impl Decodable for Vec<TimedNetworkAddr> {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Vec<TimedNetworkAddr>, Error> {
 
+        trace!("decode");
         let mut result: Vec<TimedNetworkAddr> = Vec::new();
         let varint = VarInt::decode(r).map_err(|_| Error::AddrCount)?;
         for _ in 0..varint.0 {
@@ -115,6 +119,7 @@ impl Decodable for NetworkAddr {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<NetworkAddr, Error> {
 
+        trace!("decode");
         let services = Service::decode(r).map_err(|_| Error::NetworkAddrServices)?;
         let ip = IpAddr::decode(r).map_err(|_| Error::NetworkAddrIp)?;
         let port = u16::decode_network_byte_order(r).map_err(|_| Error::NetworkAddrPort)?;
@@ -134,6 +139,7 @@ impl Decodable for TimedNetworkAddr {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<TimedNetworkAddr, Error> {
 
+        trace!("decode");
         let time = u32::decode(r).map_err(|_| Error::TimedNetworkAddrTime)?;
         let addr = NetworkAddr::decode(r)?;
 
@@ -149,6 +155,7 @@ impl Decodable for TimedNetworkAddr {
 impl Encodable for IpAddr {
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
 
+        trace!("encode");
         let ipv6 :Ipv6Addr = match *self {
             IpAddr::V4(ip4) => ip4.to_ipv6_mapped(),
             IpAddr::V6(ip6) => ip6,
@@ -161,6 +168,7 @@ impl Encodable for IpAddr {
 impl Decodable for IpAddr {
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<IpAddr, Error> {
 
+        trace!("decode");
         let b1 = u16::decode_network_byte_order(r).map_err(|_| Error::IpAddrB1)?;
         let b2 = u16::decode_network_byte_order(r).map_err(|_| Error::IpAddrB2)?;
         let b3 = u16::decode_network_byte_order(r).map_err(|_| Error::IpAddrB3)?;

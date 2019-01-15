@@ -28,6 +28,7 @@ pub struct Pong {
 impl Encodable for Pong {
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<(), Error> {
+        trace!("encode");
         self.nonce.encode(w).map_err(|_| Error::PongNonce)?;
         Ok(())
     }
@@ -36,6 +37,7 @@ impl Encodable for Pong {
 impl Decodable for Pong {
 
     fn decode(r: &mut Cursor<&Vec<u8>>) -> Result<Pong, Error> {
+        trace!("decode");
         let nonce = u64::decode(r).map_err(|_| Error::PongNonce)?;
         let result = Pong {
             nonce: nonce

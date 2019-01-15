@@ -41,15 +41,19 @@ impl WalkerSmEvents for NodeWalker  {
     fn run(&mut self) {
 
 
-        println!("run");
+        trace!("run");
         let mut iteration = 0;
         let mut sm = Machine::new(Init).as_enum();
 
         loop {
-            let onesec = time::Duration::from_millis(500);
-            thread::sleep(onesec);
 
-            println!("{} {:?}", iteration, sm);
+            let sleep = time::Duration::from_millis(500);
+            thread::sleep(sleep);
+
+            debug!("run [sm: {:?}]", sm);
+            debug!("run [i: {:?}]", iteration);
+            debug!("run [sleep: {:?}]", sleep);
+
             iteration = iteration + 1;
 
             sm = match sm {
@@ -76,11 +80,13 @@ impl WalkerSmEvents for NodeWalker  {
                 EndByParseAddr(m) => { self.on_end_by_parse_addr(m); break; },
             };
         }
+
+        debug!("run finished");
     }
 
     fn on_initial_init(&mut self, m: Machine<Init, NoneEvent>) -> Variant {
 
-        println!("on_initial_init");
+        trace!("on_initial_init");
         match self.init_connect_retry() {
             InitConnectResult::Succeed => m.transition(ConnectSocket).as_enum(),
             InitConnectResult::ConnectFailed => m.transition(ConnectFailed).as_enum(),
@@ -91,7 +97,7 @@ impl WalkerSmEvents for NodeWalker  {
 
     fn on_init_by_connect_failed(&mut self, m: Machine<Init, ConnectFailed>) -> Variant {
 
-        println!("on_init_by_connect_failed");
+        trace!("on_init_by_connect_failed");
         match self.connect_retry() {
             ConnectRetryResult::Succeed => m.transition(ConnectSocket).as_enum(),
             ConnectRetryResult::ConnectFailed => m.transition(ConnectFailed).as_enum(),
@@ -101,7 +107,7 @@ impl WalkerSmEvents for NodeWalker  {
 
     fn on_connect_by_connect_socket(&mut self, m: Machine<Connect, ConnectSocket>) -> Variant {
 
-        println!("on_connect_by_connect_socket");
+        trace!("on_connect_by_connect_socket");
         match self.send_version() {
             SendMessageResult::Succeed => m.transition(SendVersion).as_enum(),
             _ => m.transition(SendVersionFailed).as_enum(),
@@ -110,7 +116,7 @@ impl WalkerSmEvents for NodeWalker  {
 
     fn on_version_sent_by_send_version(&mut self, m: Machine<VersionSent, SendVersion>) -> Variant {
 
-        println!("on_version_sent_by_send_version");
+        trace!("on_version_sent_by_send_version");
         match self.receive_version() {
             ReceiveMessageResult::Succeed => m.transition(ReceiveVersion).as_enum(),
             _ => m.transition(ReceiveVersionFailed).as_enum(),
@@ -119,7 +125,7 @@ impl WalkerSmEvents for NodeWalker  {
 
     fn on_version_received_by_receive_version(&mut self, m: Machine<VersionReceived, ReceiveVersion>) -> Variant {
         
-        println!("on_version_received_by_receive_version");
+        trace!("on_version_received_by_receive_version");
         match self.receive_verack() {
             ReceiveMessageResult::Succeed => m.transition(ReceiveVerack).as_enum(),
             _ => m.transition(ReceiveVerackFailed).as_enum(),
@@ -128,7 +134,7 @@ impl WalkerSmEvents for NodeWalker  {
 
     fn on_verack_received_by_receive_verack(&mut self, m: Machine<VerackReceived, ReceiveVerack>) -> Variant {
 
-        println!("on_verack_received_by_receive_verack");
+        trace!("on_verack_received_by_receive_verack");
         match self.send_verack() {
             SendMessageResult::Succeed => m.transition(SendVerack).as_enum(),
             _ => m.transition(SendVerackFailed).as_enum(),
@@ -137,14 +143,14 @@ impl WalkerSmEvents for NodeWalker  {
 
     fn on_verack_sent_by_send_verack(&mut self, m: Machine<VerackSent, SendVerack>) -> Variant {
 
-        println!("on_verack_sent_by_send_verack");
+        trace!("on_verack_sent_by_send_verack");
         self.set_version();
         m.transition(SetVersion).as_enum()
     }
 
     fn on_handshake_by_set_version(&mut self, m: Machine<Handshake, SetVersion>) -> Variant {
 
-        println!("on_handshake_by_set_version");
+        trace!("on_handshake_by_set_version");
         match self.send_getaddr_retry() {
             SendGetAddrRetryResult::Succeed => m.transition(SendGetAddr).as_enum(),
             SendGetAddrRetryResult::Failed => m.transition(SendGetAddrFailed).as_enum(),
@@ -154,7 +160,7 @@ impl WalkerSmEvents for NodeWalker  {
 
     fn on_handshake_by_receive_other(&mut self, m: Machine<Handshake, ReceiveOther>) -> Variant {
 
-        println!("on_handshake_by_receive_other");
+        trace!("on_handshake_by_receive_other");
         match self.send_getaddr_retry() {
             SendGetAddrRetryResult::Succeed => m.transition(SendGetAddr).as_enum(),
             SendGetAddrRetryResult::Failed => m.transition(SendGetAddrFailed).as_enum(),
@@ -164,7 +170,7 @@ impl WalkerSmEvents for NodeWalker  {
 
     fn on_handshake_by_send_getaddr_failed(&mut self, m: Machine<Handshake, SendGetAddrFailed>) -> Variant {
 
-        println!("on_handshake_by_receive_other");
+        trace!("on_handshake_by_receive_other");
         match self.send_getaddr_retry() {
             SendGetAddrRetryResult::Succeed => m.transition(SendGetAddr).as_enum(),
             SendGetAddrRetryResult::Failed => m.transition(SendGetAddrFailed).as_enum(),
@@ -174,7 +180,7 @@ impl WalkerSmEvents for NodeWalker  {
 
     fn on_get_addr_by_send_getaddr(&mut self, m: Machine<GetAddr, SendGetAddr>) -> Variant {
 
-        println!("on_get_addr_by_send_addr");
+        trace!("on_get_addr_by_send_addr");
         match self.receive_addr() {
             ReceiveMessageResult::Succeed => m.transition(ReceiveAddr).as_enum(),
             _ => m.transition(ReceiveOther).as_enum(),
@@ -183,56 +189,56 @@ impl WalkerSmEvents for NodeWalker  {
 
     fn on_addr_by_receive_addr(&mut self, m: Machine<Addr, ReceiveAddr>) -> Variant {
 
-        println!("on_addr_by_receive_addr");
+        trace!("on_addr_by_receive_addr");
         self.parse_addr();
         m.transition(ParseAddr).as_enum()
     }
 
     fn on_end_by_parse_addr_failed(&self, _m: Machine<End, ParseAddrFailed>) {
 
-        println!("on_end_by_parse_addr_failed");
+        trace!("on_end_by_parse_addr_failed");
         self.end();
     }
 
     fn on_end_by_retry_failed(&self, _m: Machine<End, RetryFailed>) {
 
-        println!("on_end_by_retry_failed");
+        trace!("on_end_by_retry_failed");
         self.end();
     }
 
     fn on_end_by_send_version_failed(&self, _m: Machine<End, SendVersionFailed>) {
 
-        println!("on_end_by_send_version_failed");
+        trace!("on_end_by_send_version_failed");
         self.end();
     }
 
     fn on_end_by_receive_version_failed(&self, _m: Machine<End, ReceiveVersionFailed>) {
 
-        println!("on_end_by_receive_version_failed");
+        trace!("on_end_by_receive_version_failed");
         self.end();
     }
 
     fn on_end_by_receive_verack_failed(&self, _m: Machine<End, ReceiveVerackFailed>) {
 
-        println!("on_end_by_receive_verack_failed");
+        trace!("on_end_by_receive_verack_failed");
         self.end();
     }
 
     fn on_end_by_send_verack_failed(&self, _m: Machine<End, SendVerackFailed>) {
 
-        println!("on_end_by_send_verack_failed");
+        trace!("on_end_by_send_verack_failed");
         self.end();
     }
 
     fn on_end_by_send_get_addr_retry_failed(&self, _m: Machine<End, SendGetAddrRetryFailed>) {
 
-        println!("on_end_by_send_get_addr_retry_failed");
+        trace!("on_end_by_send_get_addr_retry_failed");
         self.end();
     }
 
     fn on_end_by_parse_addr(&self, _m: Machine<End, ParseAddr>) {
 
-        println!("on_end_by_parse_addr");
+        trace!("on_end_by_parse_addr");
         self.end();
     }
 }
