@@ -37,7 +37,7 @@ fn main() {
     let resolver = resolver::Resolver::new(config.dns_seeds);
     let provider = provider::NodeProvider::new(&config.sqlite_path).unwrap();
 
-    let program = program::Program::new(
+    let mut program = program::Program::new(
         resolver,
         provider
     );

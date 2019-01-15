@@ -38,7 +38,7 @@ impl Program {
         }
     }
 
-    pub fn run(&self) {
+    pub fn run(&mut self) {
 
         trace!("run");
 
@@ -55,7 +55,7 @@ impl Program {
         }
     }
 
-    fn seed(&self) {
+    fn seed(&mut self) {
 
         trace!("seed");
 
@@ -84,7 +84,7 @@ impl Program {
 
     }
 
-    fn walk(&self) {
+    fn walk(&mut self) {
 
         trace!("walk");
 
@@ -115,18 +115,18 @@ impl Program {
                 let result = walker.ips();
                 info!("walk [result: {}]", result.len());
                 sender.send((src, result));
-
+                drop(sender);
             });
 
+        drop(sender);
+
         while let Ok((src, ips)) = receiver.recv() {
-                warn!("walk [rcv]");
+            debug!("walk [rcv]");
 
             let inserted = self.provider.bulkinsert(ips, &src);
             if let Err(err) = inserted {
-                warn!("walk [err: {}]", err);
+                trace!("walk [err: {}]", err);
             }
         }
-
     }
-
 }

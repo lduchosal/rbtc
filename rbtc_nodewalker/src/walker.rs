@@ -27,10 +27,7 @@ impl NodeWalker {
 
     pub fn new(nodeip: &String) -> NodeWalker {
 
-        let mut node_ip_port = nodeip.clone();
-        if ! nodeip.ends_with(":8333") {
-            node_ip_port.push_str(":8333");
-        }
+        let node_ip_port = nodeip.clone();
         let response = Vec::new();
         let messages = Vec::new();
         let ips: Vec<String>= Vec::new();
@@ -79,6 +76,7 @@ impl NodeWalker {
 
         self.connect_retry = self.connect_retry + 1;
         if retry >= maxretry {
+            warn!("connect_retry [TooManyRetry]");
             return ConnectRetryResult::TooManyRetry;
         }
 
@@ -93,13 +91,22 @@ impl NodeWalker {
         trace!("init");
         debug!("init [node_ip_port: {}]", self.node_ip_port);
 
-        match self.node_ip_port.parse() {
+        let mut node_ip_port = self.node_ip_port.clone();
+
+        if let Ok(addr) = node_ip_port.parse() {
+            self.addr = Some(addr);
+            return InitResult::Succeed;
+        }
+        
+        node_ip_port.push_str(":8333");
+        match node_ip_port.parse() {
             Ok(addr) => {
                 self.addr = Some(addr);
                 InitResult::Succeed
             },
             Err(err) => {
-                warn!("init parse [err: {}]", err);
+                warn!("init [err: {}]", err);
+                warn!("init [node_ip_port: {}]", node_ip_port);
                 InitResult::ParseAddrFailed
             }
         }
@@ -145,7 +152,10 @@ impl NodeWalker {
         let messages = MessageProvider::version();
         match self.send(messages) {
             SendResult::Succeed => SendMessageResult::Succeed,
-            _ => SendMessageResult::Failed
+            _ => {
+                warn!("send_version [Failed]");
+                SendMessageResult::Failed
+            }
         }
     }
 

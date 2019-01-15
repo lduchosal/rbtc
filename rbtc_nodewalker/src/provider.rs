@@ -8,6 +8,7 @@ use std::fmt;
 use rusqlite::types::ToSql;
 use rusqlite::{Connection, NO_PARAMS};
 
+
 #[derive(Debug)]
 pub enum ProviderError {
     New,
@@ -15,7 +16,11 @@ pub enum ProviderError {
     Insert,
     InsertIterator,
     Select,
-    SelectIterator
+    SelectIterator,
+
+    Transaction,
+    Savepoint,
+    Commit,
 }
 
 impl fmt::Display for ProviderError {
@@ -60,35 +65,36 @@ impl NodeProvider {
         ).map_err(|_| ProviderError::Init)
     }
 
-    pub fn insert(&self, n: &Node) -> Result<usize, ProviderError> {
-
-        trace!("insert");
-
-        self.conn.execute(
-            "INSERT OR IGNORE INTO node (ip, src, creation) VALUES (?1, ?2, ?3)",
-            &[ 
-                &n.ip as &ToSql, 
-                &n.src as &ToSql, 
-                &n.creation
-            ],
-            )
-            .map_err(|_| ProviderError::Insert)
-    }
-
-    pub fn bulkinsert(&self, ips: Vec<String>, src: &String) -> Result<(), ProviderError> {
+    pub fn bulkinsert(&mut self, ips: Vec<String>, src: &String) -> Result<(), ProviderError> {
         
         trace!("bulkinsert");
+        trace!("bulkinsert [ips: {}]", ips.len());
 
         let now = chrono::Local::now();
-        for ip in ips {
-            let node = Node {
-                id: 0,
-                ip: ip,
-                src: src.clone(),
-                creation: now.timestamp(),
-            };
-            self.insert(&node).map_err(|_| ProviderError::InsertIterator)?;
+        let mut tx = self.conn.transaction().map_err(|_| ProviderError::Transaction)?;
+        {
+            let sp = tx.savepoint().map_err(|_| ProviderError::Savepoint)?;
+
+            for ip in ips {
+                let n = Node {
+                    id: 0,
+                    ip: ip,
+                    src: src.clone(),
+                    creation: now.timestamp(),
+                };
+                
+
+                sp.execute("INSERT OR IGNORE INTO node (ip, src, creation) VALUES (?1, ?2, ?3)",
+                &[ 
+                    &n.ip as &ToSql, 
+                    &n.src as &ToSql, 
+                    &n.creation
+                ],
+                ).map_err(|_| ProviderError::Insert)?;
+
+            }
         }
+        tx.commit().map_err(|_| ProviderError::Commit)?;
 
         Ok(())
     }
@@ -134,7 +140,7 @@ impl NodeProvider {
             SELECT  id, ip, src, creation 
               FROM node
               ORDER BY id DESC
-              LIMIT 10;
+              LIMIT 1000;
               ")
             .unwrap()
             ;
