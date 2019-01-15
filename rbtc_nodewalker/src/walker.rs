@@ -76,7 +76,6 @@ impl NodeWalker {
 
         self.connect_retry = self.connect_retry + 1;
         if retry >= maxretry {
-            warn!("connect_retry [TooManyRetry]");
             return ConnectRetryResult::TooManyRetry;
         }
 

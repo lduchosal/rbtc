@@ -80,7 +80,6 @@ impl WalkerSmEvents for NodeWalker  {
                 EndByParseAddr(m) => { self.on_end_by_parse_addr(m); break; },
             };
         }
-
         debug!("run finished");
     }
 
