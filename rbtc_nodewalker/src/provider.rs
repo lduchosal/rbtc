@@ -17,6 +17,7 @@ pub enum ProviderError {
     InsertIterator,
     Select,
     SelectIterator,
+    Update,
 
     Transaction,
     Savepoint,
@@ -32,6 +33,12 @@ impl fmt::Display for ProviderError {
 pub struct NodeProvider {
     conn: Connection,
 }
+
+
+const NEW : i64 = 0;
+const VALID : i64 = 1;
+const DELETED : i64 = 2;
+const DEACTIVATE : i64 = 4;
 
 impl NodeProvider {
 
@@ -58,43 +65,100 @@ impl NodeProvider {
                 id  INTEGER PRIMARY KEY,
                 ip  VARCHAR(64) UNIQUE NOT NULL,
                 src VARCHAR(64) NOT NULL,
-                creation DATETIME NOT NULL
+                creation DATETIME NOT NULL,
+                updated DATETIME NOT NULL,
+                status INTEGER NOT NULL
             )
         ",
             NO_PARAMS,
         ).map_err(|_| ProviderError::Init)
     }
 
-    pub fn bulkinsert(&mut self, ips: Vec<String>, src: &String) -> Result<(), ProviderError> {
+    pub fn bulkinsert(&mut self, ips: Vec<String>, src: &String, id: u32) -> Result<(), ProviderError> {
         
         trace!("bulkinsert");
-        trace!("bulkinsert [ips: {}]", ips.len());
+        debug!("bulkinsert [src: {}]", src);
+        debug!("bulkinsert [ips: {}]", ips.len());
 
         let now = chrono::Local::now();
-        let mut tx = self.conn.transaction().map_err(|_| ProviderError::Transaction)?;
-        {
-            let sp = tx.savepoint().map_err(|_| ProviderError::Savepoint)?;
 
-            for ip in ips {
-                let n = Node {
-                    id: 0,
-                    ip: ip,
-                    src: src.clone(),
-                    creation: now.timestamp(),
-                };
-                
-
-                sp.execute("INSERT OR IGNORE INTO node (ip, src, creation) VALUES (?1, ?2, ?3)",
-                &[ 
-                    &n.ip as &ToSql, 
-                    &n.src as &ToSql, 
-                    &n.creation
-                ],
-                ).map_err(|_| ProviderError::Insert)?;
-
-            }
+        for ip in ips {
+            let n = Node {
+                id: 0,
+                ip: ip,
+                src: src.clone(),
+                creation: now.timestamp(),
+                updated: now.timestamp(),
+                status: NEW,
+            };
+            
+            trace!("bulkinsert insert");
+            self.conn.execute("
+            INSERT OR IGNORE
+                INTO node (ip, src, creation, updated, status) 
+            VALUES (?1, ?2, ?3, ?4, ?5)",
+            &[ 
+                &n.ip as &ToSql, 
+                &n.src as &ToSql, 
+                &n.creation,
+                &n.updated,
+                &n.status as &ToSql,
+            ],
+            ).map_err(|_| ProviderError::Insert)?;
         }
-        tx.commit().map_err(|_| ProviderError::Commit)?;
+
+        trace!("bulkinsert update");
+        self.conn.execute("
+            UPDATE node 
+                SET updated = ?1, 
+                    status = ?2
+            WHERE id = ?3
+                    ;",
+        &[ 
+            now.timestamp(),
+            VALID,
+            id as i64 
+        ],
+        ).map_err(|_| ProviderError::Update)?;
+
+        Ok(())
+    }
+    
+
+    pub fn delete(&mut self, id: u32) -> Result<(), ProviderError> {
+        
+        trace!("delete");
+        trace!("delete [id: {}]", id);
+        self.update(id, DELETED)
+    }
+    
+    pub fn deactivate(&mut self, id: u32) -> Result<(), ProviderError> {
+        
+        trace!("delete");
+        trace!("delete [id: {}]", id);
+        self.update(id, DEACTIVATE)
+    }
+    
+
+    pub fn update(&mut self, id: u32, status: i64) -> Result<(), ProviderError> {
+        
+        trace!("update");
+        trace!("update [id: {}]", id);
+        trace!("update [status: {}]", status);
+
+        let now = chrono::Local::now();
+        self.conn.execute("
+            UPDATE node 
+                SET updated = ?1, 
+                    status = ?2
+              WHERE id = ?3
+                    ;",
+        &[ 
+            now.timestamp(),
+            status,
+            id as i64 
+        ],
+        ).map_err(|_| ProviderError::Update)?;
 
         Ok(())
     }
@@ -105,7 +169,7 @@ impl NodeProvider {
 
         let mut stmt = self.conn
             .prepare("
-            SELECT id, ip, src, creation 
+            SELECT id, ip, src, creation, updated, status
               FROM node
               ;
               ")
@@ -117,7 +181,9 @@ impl NodeProvider {
                 id: row.get(0),
                 ip: row.get(1),
                 src: row.get(2),
-                creation: row.get(3)
+                creation: row.get(3),
+                updated: row.get(4),
+                status: row.get(5)
             })
             .map_err(|_| ProviderError::Select)?;
 
@@ -137,10 +203,11 @@ impl NodeProvider {
 
         let mut stmt = self.conn
             .prepare("
-            SELECT  id, ip, src, creation 
-              FROM node
-              ORDER BY id DESC
-              LIMIT 1000;
+             SELECT id, ip, src, creation, updated, status
+               FROM node
+              WHERE status = 0
+           ORDER BY id DESC
+              LIMIT 100;
               ")
             .unwrap()
             ;
@@ -151,6 +218,8 @@ impl NodeProvider {
                 ip: row.get(1),
                 src: row.get(2),
                 creation: row.get(3),
+                updated: row.get(4),
+                status: row.get(5),
             })
             .map_err(|_| ProviderError::Select)?;
 

@@ -1,5 +1,6 @@
 
 use crate::message::MessageProvider;
+use crate::walker::result::*;
 
 use rbtc::network::message::Message;
 use rbtc::network::message::Payload;
@@ -12,7 +13,9 @@ use std::io::{Cursor};
 
 
 pub struct NodeWalker {
+    id: u32,
     node_ip_port: String,
+    
     connect_retry: u8,
     getaddr_retry: u8,
 
@@ -21,11 +24,20 @@ pub struct NodeWalker {
     stream: Option<TcpStream>,
     response: Vec<u8>,
     messages: Vec<Message>,
+
+    result: Option<EndResult>,
+}
+
+pub struct WalkResult {
+    pub id: u32,
+    pub src: String,
+    pub ips: Vec<String>,
+    pub result: Option<EndResult>,
 }
 
 impl NodeWalker {
 
-    pub fn new(nodeip: &String) -> NodeWalker {
+    pub fn new(id: u32, nodeip: &String) -> NodeWalker {
 
         let node_ip_port = nodeip.clone();
         let response = Vec::new();
@@ -33,6 +45,7 @@ impl NodeWalker {
         let ips: Vec<String>= Vec::new();
 
         NodeWalker {
+            id: id,
             connect_retry: 0,
             getaddr_retry: 0,
             node_ip_port: node_ip_port,
@@ -41,11 +54,18 @@ impl NodeWalker {
             stream: None,
             response: response,
             messages: messages,
+            result: None,
         }
     }
 
-    pub fn ips(&self) -> Vec<String> {
-        self.ips.clone()
+    pub fn result(&mut self) -> WalkResult {
+
+        WalkResult {
+            id: self.id,
+            src: self.node_ip_port.clone(),
+            ips: self.ips.clone(),
+            result: self.result.clone(),
+        }
     }
 
     pub(crate) fn init_connect_retry(&mut self) -> InitConnectResult  {
@@ -413,64 +433,9 @@ impl NodeWalker {
         }
     }
 
-    pub(crate) fn end(&self) {
+    pub(crate) fn end(&mut self, result: EndResult) {
         trace!("end");
+        debug!("end [{:?}]", result);
+        self.result = Some(result);
     }
-}
-
-pub enum ConnectResult {
-    Succeed,
-    ConnectFailed,
-}
-
-pub enum InitResult {
-    Succeed,
-    ParseAddrFailed,
-}
-
-pub enum InitConnectResult {
-    Succeed,
-    ParseAddrFailed,
-    ConnectFailed,
-    TooManyRetry,
-}
-
-pub enum SendResult {
-    Succeed,
-    EncodeFailed,
-    WriteFailed,
-}
-
-pub enum SendMessageResult {
-    Succeed,
-    Failed,
-}
-
-pub enum ConnectRetryResult {
-    Succeed,
-    ConnectFailed,
-    TooManyRetry,
-}
-
-pub enum ReceiveResult {
-    ReadFailed,
-    ReadEmpty,
-    ReadSome,
-}
-
-pub enum DecodeResult {
-    NeedMoreData,
-    DecodeFailed,
-    Succeed
-}
-
-pub enum ReceiveMessageResult {
-    Failed,
-    Succeed
-}
-
-pub enum SendGetAddrRetryResult {
-    TooManyRetry,
-    Succeed,
-    Failed
 }

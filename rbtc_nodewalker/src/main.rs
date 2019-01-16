@@ -8,7 +8,6 @@ pub mod config;
 pub mod resolver;
 pub mod provider;
 pub mod node;
-pub mod fsm;
 pub mod walker;
 pub mod program;
 pub mod message;

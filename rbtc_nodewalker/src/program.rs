@@ -1,8 +1,11 @@
 use crate::resolver;
 use crate::provider;
-use crate::walker;
+use crate::walker::*;
+use crate::walker::result::*;
+use crate::walker::walker::NodeWalker;
+use crate::walker::walker::WalkResult;
+use crate::walker::fsm::WalkerSmEvents;
 use crate::node;
-use crate::fsm::WalkerSmEvents;
 
 use rayon::prelude::*;
 
@@ -20,7 +23,7 @@ pub struct Program {
 
 pub struct Comm {
     node: node::Node,
-    sender: Sender<(String, Vec<String>)>
+    sender: Sender<WalkResult>
 }
 
 impl Program {
@@ -66,7 +69,7 @@ impl Program {
             ;
 
         let src = String::from("dnsseed");
-        self.provider.bulkinsert(ips, &src).unwrap();
+        self.provider.bulkinsert(ips, &src, 0).unwrap();
 
     }
 
@@ -88,7 +91,7 @@ impl Program {
 
         trace!("walk");
 
-        let (sender, receiver) : (Sender<(String, Vec<String>)>, Receiver<(String, Vec<String>)>)= channel();
+        let (sender, receiver) : (Sender<WalkResult>, Receiver<WalkResult>)= channel();
 
         let nodes = self.provider.ten()
             .unwrap();
@@ -107,26 +110,90 @@ impl Program {
                 let node = comm.node;
                 let sender = comm.sender;
 
+                let id = node.id;
                 let src = node.ip.clone();
+                info!("walk [id: {}]", id);
                 info!("walk [src: {}]", src);
-                let mut walker = walker::NodeWalker::new(&src);
+
+                let mut walker = walker::NodeWalker::new(id, &src);
                 walker.run();
-                
-                let result = walker.ips();
-                info!("walk [result: {}]", result.len());
-                sender.send((src, result));
+
+                let result = walker.result();
+                sender.send(result);
+
                 drop(sender);
             });
 
         drop(sender);
 
-        while let Ok((src, ips)) = receiver.recv() {
-            debug!("walk [rcv]");
+        while let Ok(walkresult) = receiver.recv() {
+            trace!("walk [rcv]");
+            self.end(walkresult);
+        }
+    }
 
-            let inserted = self.provider.bulkinsert(ips, &src);
-            if let Err(err) = inserted {
-                trace!("walk [err: {}]", err);
+    fn end(&mut self, walkresult: WalkResult) {
+    
+        trace!("end");
+        debug!("end [src: {:?}]", walkresult.src);
+        debug!("end [result: {:?}]", walkresult.result);
+        debug!("end [ips: {:?}]", walkresult.ips.len());
+
+        match &walkresult.result {
+            None => error!("end [result: None]"),
+            Some(result) => {
+                match result {
+                    EndResult::ParseAddr => self.insert(walkresult),
+                    EndResult::ParseAddrFailed => self.delete(walkresult),
+                    EndResult::RetryFailed =>  self.delete(walkresult),
+                    EndResult::SendVersionFailed => self.deactivate(walkresult),
+                    EndResult::ReceiveVersionFailed => self.deactivate(walkresult),
+                    EndResult::ReceiveVerackFailed => self.deactivate(walkresult),
+                    EndResult::SendVerackFailed => self.deactivate(walkresult),
+                    EndResult::SendGetAddrRetryFailed => self.deactivate(walkresult),
+                }
             }
         }
+    }
+
+    fn insert(&mut self, walkresult: WalkResult) {
+        trace!("insert");
+
+        let src = &walkresult.src;
+        let ips = walkresult.ips;
+        let id = walkresult.id;
+
+        debug!("delete [id: {}]", id);
+        debug!("delete [src: {}]", src);
+        debug!("insert [ips: {}]", ips.len());
+
+        let inserted = self.provider.bulkinsert(ips, src, id);
+        if let Err(err) = inserted {
+            error!("insert [err: {}]", err);
+        }
+    }
+
+    fn delete(&mut self, walkresult: WalkResult) {
+        trace!("delete");
+        let id = walkresult.id;
+        debug!("delete [src: {}]", id);
+
+        let deleted = self.provider.delete(id);
+        if let Err(err) = deleted {
+            error!("delete [err: {}]", err);
+        }
+
+    }
+
+    fn deactivate(&mut self, walkresult: WalkResult) {
+        trace!("deactivate");
+        let id = walkresult.id;
+        debug!("deactivate [id: {}]", id);
+
+        let deactivate = self.provider.deactivate(id);
+        if let Err(err) = deactivate {
+            error!("deactivate [err: {}]", err);
+        }
+
     }
 }

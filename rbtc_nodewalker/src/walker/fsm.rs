@@ -1,6 +1,8 @@
 extern crate sm;
 
 use crate::walker::*;
+use crate::walker::walker::NodeWalker;
+use crate::walker::result::*;
 
 use sm::NoneEvent;
 use sm::sm;
@@ -26,14 +28,14 @@ pub(crate) trait WalkerSmEvents {
     fn on_get_addr_by_send_getaddr(&mut self, m: Machine<GetAddr, SendGetAddr>) -> Variant;
     fn on_addr_by_receive_addr(&mut self, m: Machine<Addr, ReceiveAddr>) -> Variant;
 
-    fn on_end_by_parse_addr_failed(&self, m: Machine<End, ParseAddrFailed>);
-    fn on_end_by_parse_addr(&self, m: Machine<End, ParseAddr>);
-    fn on_end_by_retry_failed(&self, m: Machine<End, RetryFailed>);
-    fn on_end_by_send_version_failed(&self, m: Machine<End, SendVersionFailed>);
-    fn on_end_by_receive_version_failed(&self, m: Machine<End, ReceiveVersionFailed>);
-    fn on_end_by_receive_verack_failed(&self, m: Machine<End, ReceiveVerackFailed>);
-    fn on_end_by_send_verack_failed(&self, m: Machine<End, SendVerackFailed>);
-    fn on_end_by_send_get_addr_retry_failed(&self, m: Machine<End, SendGetAddrRetryFailed>);
+    fn on_end_by_parse_addr_failed(&mut self, m: Machine<End, ParseAddrFailed>);
+    fn on_end_by_parse_addr(&mut self, m: Machine<End, ParseAddr>);
+    fn on_end_by_retry_failed(&mut self, m: Machine<End, RetryFailed>);
+    fn on_end_by_send_version_failed(&mut self, m: Machine<End, SendVersionFailed>);
+    fn on_end_by_receive_version_failed(&mut self, m: Machine<End, ReceiveVersionFailed>);
+    fn on_end_by_receive_verack_failed(&mut self, m: Machine<End, ReceiveVerackFailed>);
+    fn on_end_by_send_verack_failed(&mut self, m: Machine<End, SendVerackFailed>);
+    fn on_end_by_send_get_addr_retry_failed(&mut self, m: Machine<End, SendGetAddrRetryFailed>);
 }
 
 impl WalkerSmEvents for NodeWalker  {
@@ -193,52 +195,52 @@ impl WalkerSmEvents for NodeWalker  {
         m.transition(ParseAddr).as_enum()
     }
 
-    fn on_end_by_parse_addr_failed(&self, _m: Machine<End, ParseAddrFailed>) {
+    fn on_end_by_parse_addr_failed(&mut self, _m: Machine<End, ParseAddrFailed>) {
 
         trace!("on_end_by_parse_addr_failed");
-        self.end();
+        self.end(EndResult::ParseAddrFailed);
     }
 
-    fn on_end_by_retry_failed(&self, _m: Machine<End, RetryFailed>) {
+    fn on_end_by_retry_failed(&mut self, _m: Machine<End, RetryFailed>) {
 
         trace!("on_end_by_retry_failed");
-        self.end();
+        self.end(EndResult::RetryFailed);
     }
 
-    fn on_end_by_send_version_failed(&self, _m: Machine<End, SendVersionFailed>) {
+    fn on_end_by_send_version_failed(&mut self, _m: Machine<End, SendVersionFailed>) {
 
         trace!("on_end_by_send_version_failed");
-        self.end();
+        self.end(EndResult::SendVersionFailed);
     }
 
-    fn on_end_by_receive_version_failed(&self, _m: Machine<End, ReceiveVersionFailed>) {
+    fn on_end_by_receive_version_failed(&mut self, _m: Machine<End, ReceiveVersionFailed>) {
 
         trace!("on_end_by_receive_version_failed");
-        self.end();
+        self.end(EndResult::ReceiveVersionFailed);
     }
 
-    fn on_end_by_receive_verack_failed(&self, _m: Machine<End, ReceiveVerackFailed>) {
+    fn on_end_by_receive_verack_failed(&mut self, _m: Machine<End, ReceiveVerackFailed>) {
 
         trace!("on_end_by_receive_verack_failed");
-        self.end();
+        self.end(EndResult::ReceiveVerackFailed);
     }
 
-    fn on_end_by_send_verack_failed(&self, _m: Machine<End, SendVerackFailed>) {
+    fn on_end_by_send_verack_failed(&mut self, _m: Machine<End, SendVerackFailed>) {
 
         trace!("on_end_by_send_verack_failed");
-        self.end();
+        self.end(EndResult::SendVerackFailed);
     }
 
-    fn on_end_by_send_get_addr_retry_failed(&self, _m: Machine<End, SendGetAddrRetryFailed>) {
+    fn on_end_by_send_get_addr_retry_failed(&mut self, _m: Machine<End, SendGetAddrRetryFailed>) {
 
         trace!("on_end_by_send_get_addr_retry_failed");
-        self.end();
+        self.end(EndResult::SendGetAddrRetryFailed);
     }
 
-    fn on_end_by_parse_addr(&self, _m: Machine<End, ParseAddr>) {
+    fn on_end_by_parse_addr(&mut self, _m: Machine<End, ParseAddr>) {
 
         trace!("on_end_by_parse_addr");
-        self.end();
+        self.end(EndResult::ParseAddr);
     }
 }
 
