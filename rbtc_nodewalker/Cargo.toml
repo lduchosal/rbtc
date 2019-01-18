@@ -13,7 +13,11 @@ sm = "0.7.0"
 log = "0.4.6"
 pretty_env_logger = "0.3.0"
 rayon = "1.0.3"
-
+threadpool = "1.7.1"
+futures = "0.1.25"
+tokio = "0.1.14"
+bytes = "0.4.11"
+mio = "0.6.16"
 
 [dependencies.rusqlite]
 version = "0.16.0"
