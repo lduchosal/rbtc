@@ -5,6 +5,7 @@ extern crate bytes;
 extern crate futures;
 
 use futures::future::lazy;
+use tokio::codec::*;
 use tokio::io::{AsyncWrite, AsyncRead};
 use tokio::net::{TcpStream, tcp::ConnectFuture};
 use bytes::{Bytes, Buf, BytesMut};
@@ -29,6 +30,7 @@ enum HelloState {
     Respond,
     RetryConnect,
     Loop5,
+    Reconnect,
 }
 
 enum HelloBranch {
@@ -50,6 +52,12 @@ struct Context {
 }
 impl HelloWorld {
 
+    fn reconnect(&mut self) -> HelloBranch {
+        println!("reconnect");
+        self.context.connect = None;
+        HelloBranch::Notify(HelloState::Connecting)
+    }
+
     fn connecting(&mut self) -> HelloBranch {
         
         println!("connecting");
@@ -59,6 +67,7 @@ impl HelloWorld {
                 let addr = "127.0.0.1:12345".parse().unwrap();
                 let stream = TcpStream::connect(&addr);
                 self.context.connect = Some(stream);
+                self.context.buffer.truncate(0);
             },
             _ => {} ,
         };
@@ -67,10 +76,14 @@ impl HelloWorld {
             None => {
                 HelloBranch::Notify(HelloState::Connecting)
             },
-            Some(ref mut connect) => {
-                match connect.poll() {
+            Some(ref mut socket) => {
+
+                match socket.poll() {
                     Ok(Async::Ready(stream)) => {
                         println!("connecting [Ready]");
+
+                        //let framed = Framed::new(stream, LinesCodec::new());
+
                         self.context.stream = Some(stream);
                         HelloBranch::Notify(HelloState::Connected)
 
@@ -108,6 +121,7 @@ impl HelloWorld {
         println!("retry_connect");
         println!("retry_connect [retry: {}]", self.retry_connect);
 
+        std::thread::sleep_ms(500);
         let mut result = HelloBranch::Notify(HelloState::Connecting);
         self.context.connect = None;
         self.retry_connect = self.retry_connect + 1;
@@ -131,6 +145,7 @@ impl HelloWorld {
                 let state = match socket.write_buf(&mut data) {
                     Ok(Async::Ready(size)) => {
                         println!("connected [Ready]");
+                        self.retry_connect = 0;
                         HelloBranch::Notify(HelloState::Receiving)
                     },
                     Ok(Async::NotReady) => {
@@ -151,14 +166,16 @@ impl HelloWorld {
     fn receiving(&mut self) -> HelloBranch {
 
         println!("receiving");
-        let mut buffer = &mut self.context.buffer;
+        
         let result2 = match self.context.stream {
             Some(ref mut socket) => {
 
                 let mut result = ReadState::Read;
                 //let read = try_ready!(socket.read_buf(&mut buffer));
+                let mut rcvbuffer = BytesMut::with_capacity(128);
 
-                let read = match socket.read_buf(&mut buffer) {
+
+                let read = match socket.read_buf(&mut rcvbuffer) {
                     Ok(Async::Ready(read)) => {
                         println!("receiving [Ready]");
                         read
@@ -173,19 +190,21 @@ impl HelloWorld {
                     }
                 };
 
+                self.context.buffer.extend_from_slice(rcvbuffer.as_ref());
+
                 println!("receiving [read: {}]", read);
-                println!("receiving [len: {}]", buffer.len());
-                println!("receiving [cap: {}]", buffer.capacity());
+                println!("receiving [len: {}]", rcvbuffer.len());
+                println!("receiving [cap: {}]", rcvbuffer.capacity());
                 //println!("receiving [value: {}]", value);
                 
                 if read == 0 {
                     result = ReadState::Failed;
                 }
                 
-                if read < buffer.capacity() {
+                if read < rcvbuffer.capacity() {
                 }
                 
-                if read == buffer.capacity() {
+                if read == rcvbuffer.capacity() {
                     result = ReadState::NeedMore;
                 }
                 
@@ -197,9 +216,7 @@ impl HelloWorld {
         match result2 {
             ReadState::NeedMore => HelloBranch::Notify(HelloState::Receiving),
             ReadState::Read => HelloBranch::Notify(HelloState::Check),
-            ReadState::Failed => {
-                HelloBranch::Stop
-            },
+            ReadState::Failed => HelloBranch::Notify(HelloState::RetryConnect),
         }
     }
 
@@ -209,14 +226,14 @@ impl HelloWorld {
 
         let buffer = &mut self.context.buffer;
         let value = String::from_utf8(buffer.to_vec()).unwrap();
-        let expected = "hi!\n".to_string();
+        let expected = "quit\n".to_string();
 
         println!("Check [buffer: {}]", buffer.len());
         println!("Check [expected: {}]", expected.len());
 
         let mut result = HelloBranch::Notify(HelloState::Respond);
-        if value == "hi!\n".to_string() {
-            result =  HelloBranch::Stop;
+        if value == expected {
+            result = HelloBranch::Notify(HelloState::Reconnect);
         }
 
         buffer.truncate(0);
@@ -263,7 +280,7 @@ impl Future for HelloWorld {
 
     fn poll(&mut self) -> Poll<(), io::Error> {
 
-        let decision : HelloBranch = match self.state {
+        let branch = match self.state {
             HelloState::Connecting => self.connecting(),
             HelloState::Loop5 => self.loop5(),
             HelloState::RetryConnect => self.retry_connect(),
@@ -271,16 +288,24 @@ impl Future for HelloWorld {
             HelloState::Receiving => self.receiving(),
             HelloState::Check => self.check(),
             HelloState::Respond => self.respond(),
+            HelloState::Reconnect => self.reconnect(),
         };
 
         let current = futures::task::current();
-        println!("poll [is_current: {}]", current.is_current());
-        println!("poll [will_notify_current: {}]", current.will_notify_current());
-        
-        match decision {
+        // println!("poll [is_current: {}]", current.is_current());
+        // println!("poll [will_notify_current: {}]", current.will_notify_current());
+
+        match branch {
             HelloBranch::Notify(state) => {
+
                 self.state = state;
-                futures::task::current().notify();
+                let notifysoon = lazy(move || {
+                    std::thread::sleep_ms(50);
+                    current.notify();
+                    Ok(())
+                });
+
+                tokio::spawn(notifysoon);
                 Ok(Async::NotReady)
             },
             HelloBranch::Continue => {
@@ -293,10 +318,9 @@ impl Future for HelloWorld {
     }
 }
 
-
 fn main() {
 
-    let buffer = BytesMut::with_capacity(1024);
+    let buffer = BytesMut::with_capacity(128);
 
     let context = Context {
         connect: None, 
