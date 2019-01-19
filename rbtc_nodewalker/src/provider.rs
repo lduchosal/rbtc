@@ -207,7 +207,7 @@ impl NodeProvider {
                FROM node
               WHERE status = 0
            ORDER BY id DESC
-              LIMIT 100;
+              LIMIT 1000;
               ")
             .unwrap()
             ;
