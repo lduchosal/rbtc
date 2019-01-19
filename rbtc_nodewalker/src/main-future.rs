@@ -37,10 +37,23 @@ where T: Future,
     }
 }
 
-fn main() {
-    let hello = Hello {};
-    let world = World {}
-    let display2 = Display2(display1);
+struct Run {}
 
-    tokio::run(display2);
+impl Future for Run {
+    type Item = ();
+    type Error = ();
+
+    fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
+
+        let hello = Hello {};
+        let world = World {}
+        let display2 = Display2(display1);
+
+    }
+}
+
+fn main() {
+
+    let run = Run {};
+    tokio::run(run);
 }
