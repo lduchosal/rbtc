@@ -4,6 +4,8 @@ extern crate bytes;
 #[macro_use]
 extern crate futures;
 
+use futures::Stream;
+use futures::Sink;
 use futures::future::lazy;
 use tokio::codec::*;
 use tokio::io::{AsyncWrite, AsyncRead};
@@ -13,16 +15,21 @@ use futures::{Future, Async, Poll};
 use std::io::{self, Cursor};
 use mio::Ready;
 
-// HelloWorld has two states, namely waiting to connect to the socket
+// TokioClient has two states, namely waiting to connect to the socket
 // and already connected to the socket
-struct HelloWorld {
-    state: HelloState,
-    context: Context,
+struct TokioClient {
+    state: State,
+
     retry_connect: u8,
     retry_loop: u8,
+
+    connect: Option<ConnectFuture>, 
+    framed: Option<Framed<TcpStream, LinesCodec>>, 
+
+    buffer: Vec<String>,
 }
 
-enum HelloState {
+enum State {
     Connecting,
     Connected,
     Receiving,
@@ -35,7 +42,7 @@ enum HelloState {
 
 enum HelloBranch {
     Continue,
-    Notify(HelloState),
+    Notify(State),
     Stop
 }
 
@@ -45,36 +52,31 @@ enum ReadState {
     Failed
 }
 
-struct Context {
-    connect: Option<ConnectFuture>, 
-    stream: Option<TcpStream>, 
-    buffer: BytesMut,
-}
-impl HelloWorld {
+impl TokioClient {
 
     fn reconnect(&mut self) -> HelloBranch {
         println!("reconnect");
-        self.context.connect = None;
-        HelloBranch::Notify(HelloState::Connecting)
+        self.connect = None;
+        HelloBranch::Notify(State::Connecting)
     }
 
     fn connecting(&mut self) -> HelloBranch {
         
         println!("connecting");
 
-        match self.context.connect {
+        match self.connect {
             None => {
                 let addr = "127.0.0.1:12345".parse().unwrap();
                 let stream = TcpStream::connect(&addr);
-                self.context.connect = Some(stream);
-                self.context.buffer.truncate(0);
+                self.connect = Some(stream);
+                self.buffer.truncate(0);
             },
             _ => {} ,
         };
 
-        match self.context.connect {
+        match self.connect {
             None => {
-                HelloBranch::Notify(HelloState::Connecting)
+                HelloBranch::Notify(State::Connecting)
             },
             Some(ref mut socket) => {
 
@@ -82,10 +84,11 @@ impl HelloWorld {
                     Ok(Async::Ready(stream)) => {
                         println!("connecting [Ready]");
 
-                        //let framed = Framed::new(stream, LinesCodec::new());
-
-                        self.context.stream = Some(stream);
-                        HelloBranch::Notify(HelloState::Connected)
+                        let framed = Framed::new(stream, LinesCodec::new());
+                        self.framed = Some(framed);
+                        self.retry_connect = 0;
+                        //self.stream = Some(stream);
+                        HelloBranch::Notify(State::Connected)
 
                     },
                     Ok(Async::NotReady) => {
@@ -94,7 +97,7 @@ impl HelloWorld {
                     },
                     Err(e) => { 
                         println!("connecting [Err: {}]", e);
-                        HelloBranch::Notify(HelloState::RetryConnect)
+                        HelloBranch::Notify(State::RetryConnect)
                     }
                 }
             }
@@ -109,8 +112,8 @@ impl HelloWorld {
 
         self.retry_loop = self.retry_loop + 1;
         let state = match self.retry_loop < 5 {
-            true => HelloState::Loop5,
-            _ => HelloState::Connecting
+            true => State::Loop5,
+            _ => State::Connecting
         };
 
         HelloBranch::Notify(state)
@@ -122,8 +125,8 @@ impl HelloWorld {
         println!("retry_connect [retry: {}]", self.retry_connect);
 
         std::thread::sleep_ms(500);
-        let mut result = HelloBranch::Notify(HelloState::Connecting);
-        self.context.connect = None;
+        let mut result = HelloBranch::Notify(State::Connecting);
+        self.connect = None;
         self.retry_connect = self.retry_connect + 1;
         if self.retry_connect > 10 {
             result = HelloBranch::Stop;
@@ -135,108 +138,79 @@ impl HelloWorld {
 
         println!("connected");
 
-        let mut data = Cursor::new(Bytes::from_static(b"hello world\n"));
-        if let Some(ref mut socket) = self.context.stream {
+        if let Some(ref mut framed) = self.framed {
 
-            // Keep trying to write the buffer to the socket as long as the
-            // buffer has more bytes it available for consumption
-            while data.has_remaining() {
-
-                let state = match socket.write_buf(&mut data) {
-                    Ok(Async::Ready(size)) => {
-                        println!("connected [Ready]");
-                        self.retry_connect = 0;
-                        HelloBranch::Notify(HelloState::Receiving)
-                    },
-                    Ok(Async::NotReady) => {
-                        println!("connected [NotReady]");
-                        HelloBranch::Notify(HelloState::Connected)
-                    },
-                    Err(e) => { 
-                        println!("connected [Err: {}]", e);
-                        HelloBranch::Notify(HelloState::RetryConnect)
-                    }
-                };
-                return state;
-            }
+            let mut send = framed.send("hello world".to_string());
+            let state = match send.poll() {
+                Ok(Async::Ready(_)) => {
+                    println!("connected [Ready]");
+                    HelloBranch::Notify(State::Receiving)
+                },
+                Ok(Async::NotReady) => {
+                    println!("connected [NotReady]");
+                    HelloBranch::Notify(State::Connected)
+                },
+                Err(e) => { 
+                    println!("connected [Err: {}]", e);
+                    HelloBranch::Notify(State::RetryConnect)
+                }
+            };
+            return state;
         }
-        HelloBranch::Notify(HelloState::RetryConnect)
+        HelloBranch::Notify(State::RetryConnect)
     }
 
     fn receiving(&mut self) -> HelloBranch {
 
         println!("receiving");
-        
-        let result2 = match self.context.stream {
-            Some(ref mut socket) => {
 
-                let mut result = ReadState::Read;
-                //let read = try_ready!(socket.read_buf(&mut buffer));
-                let mut rcvbuffer = BytesMut::with_capacity(128);
+        if let Some(ref mut framed) = self.framed {
 
-
-                let read = match socket.read_buf(&mut rcvbuffer) {
-                    Ok(Async::Ready(read)) => {
-                        println!("receiving [Ready]");
-                        read
-                    },
-                    Ok(Async::NotReady) => {
-                        println!("receiving [NotReady]");
-                        return HelloBranch::Continue;
-                    },
-                    Err(e) => { 
-                        println!("receiving [Err: {}]", e);
-                        return HelloBranch::Notify(HelloState::RetryConnect)
-                    }
-                };
-
-                self.context.buffer.extend_from_slice(rcvbuffer.as_ref());
-
-                println!("receiving [read: {}]", read);
-                println!("receiving [len: {}]", rcvbuffer.len());
-                println!("receiving [cap: {}]", rcvbuffer.capacity());
-                //println!("receiving [value: {}]", value);
-                
-                if read == 0 {
-                    result = ReadState::Failed;
+            let state = match framed.poll() {
+                Ok(Async::Ready(Some(line))) => {
+                    println!("receiving [Ready: {}]", line);
+                    self.buffer.push(line);
+                    HelloBranch::Notify(State::Check)
+                },
+                Ok(Async::Ready(None)) => {
+                    println!("receiving [Ready: None]");
+                    HelloBranch::Notify(State::RetryConnect)
+                },
+                Ok(Async::NotReady) => {
+                    println!("receiving [NotReady]");
+                    HelloBranch::Continue
+                },
+                Err(e) => { 
+                    println!("receiving [Err: {}]", e);
+                    HelloBranch::Notify(State::RetryConnect)
                 }
-                
-                if read < rcvbuffer.capacity() {
-                }
-                
-                if read == rcvbuffer.capacity() {
-                    result = ReadState::NeedMore;
-                }
-                
-                result
-            }
-            _ => ReadState::Failed
-        };
-
-        match result2 {
-            ReadState::NeedMore => HelloBranch::Notify(HelloState::Receiving),
-            ReadState::Read => HelloBranch::Notify(HelloState::Check),
-            ReadState::Failed => HelloBranch::Notify(HelloState::RetryConnect),
+            };
+            return state;
         }
+        HelloBranch::Notify(State::RetryConnect)
+
     }
 
     fn check(&mut self) -> HelloBranch {
 
         println!("Check");
+        let mut result = HelloBranch::Notify(State::Respond);
+        let expected = "quit".to_string();
 
-        let buffer = &mut self.context.buffer;
-        let value = String::from_utf8(buffer.to_vec()).unwrap();
-        let expected = "quit\n".to_string();
+        println!("Check [buffer: {}]", self.buffer.len());
+        println!("Check [expected: {}]", expected);
 
-        println!("Check [buffer: {}]", buffer.len());
-        println!("Check [expected: {}]", expected.len());
+        match self.buffer.pop() {
 
-        let mut result = HelloBranch::Notify(HelloState::Respond);
-        if value == expected {
-            result = HelloBranch::Notify(HelloState::Reconnect);
+            None => {},
+            Some(value) => {
+                println!("Check [value: {}]", value);
+                if *value == expected {
+                    result = HelloBranch::Notify(State::Reconnect);
+                }
+            }
         }
 
-        buffer.truncate(0);
         result
     }
 
@@ -244,57 +218,48 @@ impl HelloWorld {
 
         println!("respond");
 
-        if let Some(ref mut socket) = self.context.stream {
+        if let Some(ref mut framed) = self.framed {
 
-            // Keep trying to write the buffer to the socket as long as the
-            // buffer has more bytes it available for consumption
-            let mut data = Cursor::new(Bytes::from_static(b"sorry\n"));
-            while data.has_remaining() {
-                // try_ready!(socket.write_buf(&mut data));
-
-                let state = match socket.write_buf(&mut data) {
-                    Ok(Async::Ready(size)) => {
-                        println!("respond [Ready]");
-                        HelloBranch::Notify(HelloState::Receiving)
-                    },
-                    Ok(Async::NotReady) => {
-                        println!("respond [NotReady]");
-                        HelloBranch::Notify(HelloState::Connected)
-                    },
-                    Err(e) => { 
-                        println!("respond [Err: {}]", e);
-                        HelloBranch::Notify(HelloState::RetryConnect)
-                    }
-                };
-                return state;
-
-            }
+            let mut send = framed.send("sorry".to_string());
+            let state = match send.poll() {
+                Ok(Async::Ready(_)) => {
+                    println!("respond [Ready]");
+                    HelloBranch::Notify(State::Receiving)
+                },
+                Ok(Async::NotReady) => {
+                    println!("respond [NotReady]");
+                    HelloBranch::Notify(State::Connected)
+                },
+                Err(e) => { 
+                    println!("respond [Err: {}]", e);
+                    HelloBranch::Notify(State::RetryConnect)
+                }
+            };
+            return state;
         }
-        HelloBranch::Notify(HelloState::Receiving)
+        HelloBranch::Notify(State::Receiving)
+
     }
 }
 
-impl Future for HelloWorld {
+impl Future for TokioClient {
     type Item = ();
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<(), io::Error> {
 
         let branch = match self.state {
-            HelloState::Connecting => self.connecting(),
-            HelloState::Loop5 => self.loop5(),
-            HelloState::RetryConnect => self.retry_connect(),
-            HelloState::Connected => self.connected(),
-            HelloState::Receiving => self.receiving(),
-            HelloState::Check => self.check(),
-            HelloState::Respond => self.respond(),
-            HelloState::Reconnect => self.reconnect(),
+            State::Connecting => self.connecting(),
+            State::Loop5 => self.loop5(),
+            State::RetryConnect => self.retry_connect(),
+            State::Connected => self.connected(),
+            State::Receiving => self.receiving(),
+            State::Check => self.check(),
+            State::Respond => self.respond(),
+            State::Reconnect => self.reconnect(),
         };
 
         let current = futures::task::current();
-        // println!("poll [is_current: {}]", current.is_current());
-        // println!("poll [will_notify_current: {}]", current.will_notify_current());
-
         match branch {
             HelloBranch::Notify(state) => {
 
@@ -320,19 +285,13 @@ impl Future for HelloWorld {
 
 fn main() {
 
-    let buffer = BytesMut::with_capacity(128);
-
-    let context = Context {
-        connect: None, 
-        stream: None,
-        buffer: buffer,
-    };
-
-    let hello_world = HelloWorld {
-        state: HelloState::Connecting,
-        context: context,
+    let hello_world = TokioClient {
+        state: State::Connecting,
         retry_connect: 0,
-        retry_loop: 0
+        retry_loop: 0,
+        connect: None, 
+        framed: None,
+        buffer: Vec::new(),
     };
 
     // Run it, here we map the error since tokio::run expects a Future<Item=(), Error=()>
