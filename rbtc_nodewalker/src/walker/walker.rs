@@ -1,4 +1,3 @@
-
 use crate::message::MessageProvider;
 use crate::walker::result::*;
 
@@ -10,7 +9,6 @@ use rbtc::encode::encode::{Encodable, Decodable};
 use std::net::{TcpStream, SocketAddr};
 use std::io::prelude::*;
 use std::io::{Cursor};
-
 
 pub struct NodeWalker {
     id: u32,

@@ -4,7 +4,7 @@ use crate::walker::*;
 use crate::walker::result::*;
 use crate::walker::walker::NodeWalker;
 use crate::walker::walker::WalkResult;
-use crate::walker::fsm::WalkerSmEvents;
+use crate::walker::fsm::WalkerFsmEvents;
 use crate::node;
 
 use rayon::prelude::*;

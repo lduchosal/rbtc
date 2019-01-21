@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "rbtc",
+    "rbtc_cli",
     "rbtc_daemon",
     "rbtc_nodewalker",
 ]
