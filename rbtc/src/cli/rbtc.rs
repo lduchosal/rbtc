@@ -1,84 +1,71 @@
-use crate::message::MessageProvider;
-use crate::walker::result::*;
+use crate::cli::result::*;
 
-use rbtc::network::message::Message;
-use rbtc::network::message::Payload;
-use rbtc::encode::error::Error;
-use rbtc::encode::encode::{Encodable, Decodable};
+use crate::network::message::Message;
+use crate::network::message::Payload;
+use crate::encode::error::Error;
+use crate::encode::encode::{Encodable, Decodable};
 
 use std::net::{TcpStream, SocketAddr};
 use std::io::prelude::*;
 use std::io::{Cursor};
 
 pub struct Rbtc {
-    id: u32,
     node_ip_port: String,
     
     connect_retry: u8,
     getaddr_retry: u8,
 
     addr: Option<SocketAddr>,
-    ips: Vec<String>,
     stream: Option<TcpStream>,
     response: Vec<u8>,
-    messages: Vec<Message>,
-
-    result: Option<EndResult>,
 }
 
 impl Rbtc {
 
-    pub fn new(id: u32, nodeip: &String) -> Rbtc {
+    pub fn new() -> Rbtc {
 
-        let node_ip_port = nodeip.clone();
         let response = Vec::new();
-        let messages = Vec::new();
-        let ips: Vec<String>= Vec::new();
+        let node_ip_port = "127.0.0.1:8333".to_string();
 
         Rbtc {
-            id: id,
             connect_retry: 0,
             getaddr_retry: 0,
             node_ip_port: node_ip_port,
             addr: None,
-            ips: ips,
             stream: None,
             response: response,
-            messages: messages,
-            result: None,
         }
     }
 
     pub(crate) fn init(&mut self) -> InitResult {
-
         trace!("init");
-        debug!("init [node_ip_port: {}]", self.node_ip_port);
+        InitResult::Succeed
+    }
+
+    pub(crate) fn set_addr(&mut self) -> SetAddrResult {
+
+        trace!("set_addr");
+        debug!("set_addr [node_ip_port: {}]", self.node_ip_port);
 
         let mut node_ip_port = self.node_ip_port.clone();
 
         if let Ok(addr) = node_ip_port.parse() {
             self.addr = Some(addr);
-            return InitResult::Succeed;
+            return SetAddrResult::Succeed;
         }
         
         node_ip_port.push_str(":8333");
         match node_ip_port.parse() {
             Ok(addr) => {
                 self.addr = Some(addr);
-                InitResult::Succeed
+                SetAddrResult::Succeed
             },
             Err(err) => {
-                warn!("init [err: {}]", err);
-                warn!("init [node_ip_port: {}]", node_ip_port);
-                InitResult::ParseAddrFailed
+                warn!("set_addr [err: {}]", err);
+                warn!("set_addr [node_ip_port: {}]", node_ip_port);
+                SetAddrResult::ParseAddrFailed
             }
         }
     }
 
-
-    pub(crate) fn end(&mut self, result: EndResult) {
-        trace!("end");
-        debug!("end [{:?}]", result);
-        self.result = Some(result);
-    }
 }

@@ -14,4 +14,5 @@ pub mod network;
 pub mod block;
 pub mod utils;
 pub mod encode;
+pub mod cli;
 mod tests;
