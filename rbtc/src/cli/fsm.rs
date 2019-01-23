@@ -15,50 +15,19 @@ use self::WalkerFsm::*;
 
 sm! {
 
-    WalkerFsm {
+    RbtcCliFsm {
 
         // Init
         InitialStates { Init }
-        ParseAddrFailed { Init => End }
-        RetryFailed { Init => End }
-        ConnectSocket { Init => Connect }
-        ConnectFailed { Init => Init }
-
-        // Connect
-        SendVersion { Connect => VersionSent }
-        SendVersionFailed { Connect => End }
-
-        // VersionSent
-        ReceiveVersion { VersionSent => VersionReceived }
-        ReceiveVersionFailed { VersionSent => End }
-
-        // VersionReceived
-        ReceiveVerack { VersionReceived => VerackReceived }
-        ReceiveVerackFailed { VersionReceived => End }
-
-        // VerackReceived
-        SendVerack { VerackReceived => VerackSent }
-        SendVerackFailed { VerackReceived => End }
-
-        // VerackSent
-        SetVersion { VerackSent => Handshake }
-
-        // Handshake
-        SendGetAddr { Handshake => GetAddr }
-        SendGetAddrFailed { Handshake => Handshake }
-        SendGetAddrRetryFailed { Handshake => End }
-
-        // GetAddr
-        ReceiveAddr { GetAddr => Addr }
-        ReceiveOther { Handshake, GetAddr => Handshake }
 
         // Addr
-        ParseAddr { Addr => End }
+        SetAddrSuceed { Init => SetAddr }
+        SetAddrFailed { Init => Init }
 
     }
 }
 
-pub(crate) trait WalkerFsmEvents {
+pub(crate) trait RbtcCliFsmEvents {
 
     fn run(&mut self);
 
@@ -99,7 +68,7 @@ pub(crate) trait WalkerFsmEvents {
     fn on_end_by_send_get_addr_retry_failed(&mut self, m: Machine<End, SendGetAddrRetryFailed>);
 }
 
-impl WalkerFsmEvents for NodeWalker  {
+impl RbtcCliEvents for RbtcCli  {
 
     fn run(&mut self) {
 
