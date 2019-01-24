@@ -5,6 +5,4 @@ pub enum InitResult {
 pub enum SetAddrResult {
     Succeed,
     ParseAddrFailed,
-    ConnectFailed,
-    TooManyRetry,
 }

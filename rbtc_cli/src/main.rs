@@ -5,7 +5,7 @@ extern crate rbtc;
 use std::process::exit;
 use copperline::Encoding::Utf8;
 use copperline::Copperline;
-use rbtc::cli::rbtc::Rbtc;
+use rbtc::cli::rbtc::RbtcPool;
 
 enum Command {
     Help,
@@ -13,9 +13,6 @@ enum Command {
     SetAddr
 }
 
-struct RbtcCli {
-    rbtc: Rbtc
-}
 
 fn main() {
 
@@ -23,16 +20,24 @@ fn main() {
     cli.run();
 }
 
+
+struct RbtcCli {
+    rbtcpool: RbtcPool
+}
+
 impl RbtcCli {
 
     fn new() -> RbtcCli {
-        let rbtc = Rbtc::new();
+
+        let rbtcpool = RbtcPool::new();
         RbtcCli {
-            rbtc: rbtc
+            rbtcpool: rbtcpool
         }
     }
 
     fn run(&self) {
+
+        self.rbtcpool.run();
         let mut cl = Copperline::new();
         while let Ok(line) = cl.read_line("rbtc> ", Utf8) {
             self.action(&line);
