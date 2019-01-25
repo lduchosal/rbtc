@@ -9,6 +9,7 @@ use rbtc::cli::rbtc::RbtcPool;
 use std::process::exit;
 use std::sync::mpsc::channel;
 use std::sync::mpsc;
+use std::sync::mpsc::{SendError, RecvError, TryRecvError};
 
 
 enum Command {
@@ -84,6 +85,8 @@ impl RbtcCli {
             "exit" => Ok(Command::Quit),
             "setaddr" => Ok(Command::SetAddr),
             "?" => Ok(Command::Help),
+            "." => Ok(Command::Help),
+            "h" => Ok(Command::Help),
             "help" => Ok(Command::Help),
             "" => Ok(Command::Empty),
             _ => Err(line),
@@ -99,9 +102,19 @@ impl RbtcCli {
     }
     
     fn try_recv(&mut self) {
-
-        while let Ok(recv) = self.rbtcpool.try_recv() {
-            println!("recv: {:#?}", recv);
+        let mut i = 0;
+        loop {
+             match self.rbtcpool.try_recv() {
+                Ok(recv) => { println!("try_recv: [rcv: {:#?}]", recv); break; },
+                Err(TryRecvError::Empty) => { 
+                    std::thread::sleep_ms(100);
+                    if i > 2 {
+                        break; 
+                    }
+                }
+                Err(err) => println!("try_recv: [err: {:#?}]", err),
+            }
+            i += 1;
         }
     }
 

@@ -93,10 +93,14 @@ impl RbtcPool {
         self.pool.join();
     }
 
-    pub fn try_recv(&mut self) -> Result<&str, TryRecvError> {
+    pub fn try_recv(&mut self) -> Result<String, TryRecvError> {
         self.recv
             .try_recv()
-            .map(|r| "")
+            .map(|r| { 
+                match r {
+                    Response::SetAddr(value) => format!("SetAddr [succeed: {}]", value)
+                }
+            })
     }
 }
 
