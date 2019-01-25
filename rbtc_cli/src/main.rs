@@ -6,10 +6,7 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use rbtc::cli::rbtc::RbtcPool;
 
-use std::process::exit;
-use std::sync::mpsc::channel;
-use std::sync::mpsc;
-use std::sync::mpsc::{SendError, RecvError, TryRecvError};
+use std::sync::mpsc::{TryRecvError};
 
 
 enum Command {
@@ -51,14 +48,16 @@ impl RbtcCli {
             match readline {
                 Ok(line) => {
                     rl.add_history_entry(line.as_ref());
-                    self.action(&line);
+                    if let Ok(command) = self.action(&line) {
+                        match command {
+                            Command::Quit => break,
+                            _ => {}
+                        }
+                    }
                 },
-                Err(ReadlineError::Interrupted) => {
-                    println!("CTRL-C");
-                    break
-                },
-                Err(ReadlineError::Eof) => {
-                    println!("CTRL-D");
+                Err(ReadlineError::Interrupted) 
+                | Err(ReadlineError::Eof) => {
+                    self.quit();
                     break
                 },
                 Err(err) => {
@@ -72,7 +71,7 @@ impl RbtcCli {
         rl.save_history("history.txt").unwrap();
     }
 
-    fn action(&mut self, line: &str) {
+    fn action(&mut self, line: &str) -> Result<Command, String> {
 
         let tokens: Vec<&str> = line.split(" ").collect();
         let first = match tokens.get(0) {
@@ -81,33 +80,34 @@ impl RbtcCli {
         };
 
         let command = match first {
-            "quit" => Ok(Command::Quit),
-            "exit" => Ok(Command::Quit),
-            "setaddr" => Ok(Command::SetAddr),
-            "?" => Ok(Command::Help),
-            "." => Ok(Command::Help),
-            "h" => Ok(Command::Help),
-            "help" => Ok(Command::Help),
+            "q" | "quit" | "exit" => Ok(Command::Quit),
+            "a" | "setaddr" | "addr" => Ok(Command::SetAddr),
+            "." | "?" | "h" | "help"  => Ok(Command::Help),
             "" => Ok(Command::Empty),
-            _ => Err(line),
+            _ => Err(line.to_string()),
         };
 
-        match command {
+        match &command {
             Ok(Command::Help) => self.help(),
             Ok(Command::Quit) => self.quit(),
             Ok(Command::SetAddr) => self.set_addr(line),
             Ok(Command::Empty) => {},
-            Err(s) => self.err(s),
+            Err(s) => self.err(s.clone()),
         };
+
+        command
     }
     
     fn try_recv(&mut self) {
         let mut i = 0;
         loop {
              match self.rbtcpool.try_recv() {
-                Ok(recv) => { println!("try_recv: [rcv: {:#?}]", recv); break; },
+                Ok(recv) => { 
+                    println!("try_recv: [rcv: {:#?}]", recv); 
+                    break; 
+                },
                 Err(TryRecvError::Empty) => { 
-                    std::thread::sleep_ms(100);
+                    std::thread::sleep_ms(5);
                     if i > 2 {
                         break; 
                     }
@@ -126,7 +126,6 @@ impl RbtcCli {
         match addrs.get(0) {
             None => {
                 self.help();
-                return;
             },
             Some(addr) => {
                 println!(" setaddr");
@@ -144,12 +143,11 @@ impl RbtcCli {
     }
 
     fn quit(&self) {
-        println!("rbtc: have fun!");
-        exit(0);
+        println!("Have fun!");
     }
 
-    fn err(&self, invalid: &str) {
-        println!("rbtc: {}: command not found", invalid);
+    fn err(&self, invalid: String) {
+        println!("{}: command not found", invalid);
     }
 
 }

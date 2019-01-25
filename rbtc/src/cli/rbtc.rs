@@ -1,9 +1,14 @@
 extern crate sm;
+extern crate mio;
+extern crate tokio;
+extern crate bytes;
+#[macro_use]
+extern crate futures;
 
 use crate::cli::*;
 use crate::cli::result::*;
 
-use std::net::{TcpStream, SocketAddr};
+use std::net::SocketAddr;
 use std::io::prelude::*;
 use std::io::{Cursor};
 
@@ -13,6 +18,11 @@ use std::sync::mpsc;
 use std::sync::mpsc::{SendError, RecvError, TryRecvError};
 use std::sync::mpsc::channel;
 use threadpool::ThreadPool;
+
+use tokio::net::{TcpStream, tcp::ConnectFuture};
+use tokio::codec::*;
+use tokio::io::{AsyncWrite, AsyncRead};
+
 
 use sm::NoneEvent;
 use sm::sm;
@@ -48,6 +58,9 @@ pub struct RbtcPool {
     send: mpsc::Sender<Request>,
     recv: mpsc::Receiver<Response>,
 }
+
+
+
 
 impl RbtcPool {
     
@@ -111,8 +124,9 @@ pub struct Rbtc {
     connect_retry: u8,
     getaddr_retry: u8,
 
-    addr: Option<SocketAddr>,
-    stream: Option<TcpStream>,
+    addr: Option<SocketAddr>,    
+    connect: Option<ConnectFuture>, 
+    framed: Option<Framed<TcpStream, LinesCodec>>, 
 
     recv: mpsc::Receiver<Request>,
     send: mpsc::Sender<Response>,
@@ -150,11 +164,15 @@ impl Rbtc {
         Rbtc {
             connect_retry: 0,
             getaddr_retry: 0,
+
             node_ip_port: node_ip_port,
             addr: None,
-            stream: None,
+            connect: None, 
+            framed: None,
+
             recv: recv,
-            send: send
+            send: send,
+
         }
     }
     
@@ -246,4 +264,46 @@ impl RbtcInternal for Rbtc {
         }
     }
 
+}
+
+
+impl Future for Rbtc {
+    type Item = ();
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<(), io::Error> {
+
+        let branch = match self.state {
+            State::Connecting => self.connecting(),
+            State::Loop5 => self.loop5(),
+            State::RetryConnect => self.retry_connect(),
+            State::Connected => self.connected(),
+            State::Receiving => self.receiving(),
+            State::Check => self.check(),
+            State::Respond => self.respond(),
+            State::Reconnect => self.reconnect(),
+        };
+
+        let current = futures::task::current();
+        match branch {
+            HelloBranch::Notify(state) => {
+
+                self.state = state;
+                let notifysoon = lazy(move || {
+                    std::thread::sleep_ms(50);
+                    current.notify();
+                    Ok(())
+                });
+
+                tokio::spawn(notifysoon);
+                Ok(Async::NotReady)
+            },
+            HelloBranch::Continue => {
+                Ok(Async::NotReady)
+            }
+            HelloBranch::Stop => {
+                Ok(Async::Ready(()))
+            }
+        }
+    }
 }
