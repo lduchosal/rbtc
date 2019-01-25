@@ -1,9 +1,9 @@
-extern crate copperline;
 extern crate encoding;
 extern crate rbtc;
+extern crate rustyline;
 
-use copperline::Encoding::Utf8;
-use copperline::Copperline;
+use rustyline::error::ReadlineError;
+use rustyline::Editor;
 use rbtc::cli::rbtc::RbtcPool;
 
 use std::process::exit;
@@ -14,7 +14,8 @@ use std::sync::mpsc;
 enum Command {
     Help,
     Quit,
-    SetAddr
+    SetAddr,
+    Empty
 }
 
 fn main() {
@@ -39,11 +40,35 @@ impl RbtcCli {
 
     fn run(&mut self) {
 
-        let mut cl = Copperline::new();
-        while let Ok(line) = cl.read_line("rbtc> ", Utf8) {
-            self.action(&line);
-            cl.add_history(line);
-        };
+        let mut rl = Editor::<()>::new();
+        if rl.load_history("history.txt").is_err() {
+            println!("No previous history.");
+        }
+
+        loop {
+            let readline = rl.readline(">> ");
+            match readline {
+                Ok(line) => {
+                    rl.add_history_entry(line.as_ref());
+                    self.action(&line);
+                },
+                Err(ReadlineError::Interrupted) => {
+                    println!("CTRL-C");
+                    break
+                },
+                Err(ReadlineError::Eof) => {
+                    println!("CTRL-D");
+                    break
+                },
+                Err(err) => {
+                    println!("Error: {:?}", err);
+                    break
+                }
+            }
+            self.try_recv();
+        }
+
+        rl.save_history("history.txt").unwrap();
     }
 
     fn action(&mut self, line: &str) {
@@ -60,6 +85,7 @@ impl RbtcCli {
             "setaddr" => Ok(Command::SetAddr),
             "?" => Ok(Command::Help),
             "help" => Ok(Command::Help),
+            "" => Ok(Command::Empty),
             _ => Err(line),
         };
 
@@ -67,8 +93,16 @@ impl RbtcCli {
             Ok(Command::Help) => self.help(),
             Ok(Command::Quit) => self.quit(),
             Ok(Command::SetAddr) => self.set_addr(line),
+            Ok(Command::Empty) => {},
             Err(s) => self.err(s),
         };
+    }
+    
+    fn try_recv(&mut self) {
+
+        while let Ok(recv) = self.rbtcpool.try_recv() {
+            println!("recv: {:#?}", recv);
+        }
     }
 
     fn set_addr(&mut self, line: &str) {
@@ -91,9 +125,9 @@ impl RbtcCli {
 
     fn help(&self) {
         println!("rbtc 0.4.0 (q)");
-        println!(" - quit : exit from rbtc");
-        println!(" - help : this message");
-        println!(" - addr hostname:port : set addr ");
+        println!("  quit");
+        println!("  help");
+        println!("  setaddr 127.0.0.1:8333");
     }
 
     fn quit(&self) {

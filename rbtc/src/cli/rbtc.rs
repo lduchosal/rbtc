@@ -1,7 +1,5 @@
 extern crate sm;
 
-use std::sync::mpsc::SendError;
-use std::sync::mpsc::RecvError;
 use crate::cli::*;
 use crate::cli::result::*;
 
@@ -11,8 +9,9 @@ use std::io::{Cursor};
 
 use std::time;
 use std::thread;
-use std::sync::mpsc::channel;
 use std::sync::mpsc;
+use std::sync::mpsc::{SendError, RecvError, TryRecvError};
+use std::sync::mpsc::channel;
 use threadpool::ThreadPool;
 
 use sm::NoneEvent;
@@ -94,6 +93,11 @@ impl RbtcPool {
         self.pool.join();
     }
 
+    pub fn try_recv(&mut self) -> Result<&str, TryRecvError> {
+        self.recv
+            .try_recv()
+            .map(|r| "")
+    }
 }
 
 pub struct Rbtc {
@@ -113,9 +117,6 @@ pub struct Rbtc {
 trait RbtcFsmEvents {
 
     // Init
-    
-
-    fn set_addr<E> (&mut self, m: Machine<Init, E>, addr: &str) -> (Variant, SetAddrResult) where E: cli::rbtc::sm::Event;
     fn set_addr_on_init_by_none_event(&mut self, m: Machine<Init, NoneEvent>, addr: &str) -> (Variant, SetAddrResult);
     fn set_addr_on_init_by_set_addr_failed(&mut self, m: Machine<Init, SetAddrFailed>, addr: &str) -> (Variant, SetAddrResult);
 }
@@ -128,15 +129,17 @@ trait RbtcInternal {
 impl Rbtc {
 
     fn recv(&self) -> Result<Request, RecvError> {
+        println!("Rbtc recv");
         self.recv.recv()
     }
 
     fn send(&self, response: Response) -> Result<(), SendError<Response>> {
+        println!("Rbtc send");
         self.send.send(response)
     }
 
     fn new(recv: mpsc::Receiver<Request>, send: mpsc::Sender<Response>) -> Rbtc {
-        println!("new");
+        println!("Rbtc new");
 
         let node_ip_port = "127.0.0.1:8333".to_string();
 
@@ -185,7 +188,7 @@ impl RbtcFsmEvents for Rbtc  {
             SetAddrResult::Succeed => m.transition(SetAddrSucceed).as_enum(),
             SetAddrResult::ParseAddrFailed => m.transition(SetAddrFailed).as_enum(),
             SetAddrResult::InvalidState => m.transition(SetAddrFailed).as_enum(),
-        }
+        };
 
         (transition, result)
     }
@@ -198,7 +201,7 @@ impl RbtcFsmEvents for Rbtc  {
             SetAddrResult::Succeed => m.transition(SetAddrSucceed).as_enum(),
             SetAddrResult::ParseAddrFailed => m.transition(SetAddrFailed).as_enum(),
             SetAddrResult::InvalidState => m.transition(SetAddrFailed).as_enum(),
-        }
+        };
 
         (transition, result)
     }
