@@ -113,6 +113,9 @@ pub struct Rbtc {
 trait RbtcFsmEvents {
 
     // Init
+    
+
+    fn set_addr<E> (&mut self, m: Machine<Init, E>, addr: &str) -> (Variant, SetAddrResult) where E: cli::rbtc::sm::Event;
     fn set_addr_on_init_by_none_event(&mut self, m: Machine<Init, NoneEvent>, addr: &str) -> (Variant, SetAddrResult);
     fn set_addr_on_init_by_set_addr_failed(&mut self, m: Machine<Init, SetAddrFailed>, addr: &str) -> (Variant, SetAddrResult);
 }
@@ -163,7 +166,7 @@ impl Rbtc {
             SetAddrResult::ParseAddrFailed => false,
             SetAddrResult::InvalidState => false,
         };
-        
+
         let response = Response::SetAddr(succeed);
         self.send(response);
 
@@ -177,19 +180,27 @@ impl RbtcFsmEvents for Rbtc  {
     fn set_addr_on_init_by_none_event(&mut self, m: Machine<Init, NoneEvent>, addr: &str) -> (Variant, SetAddrResult)  {
         println!("set_addr_on_init_by_none_event");
 
-        match self.do_set_addr(addr) {
-            SetAddrResult::Succeed => (m.transition(SetAddrSucceed).as_enum(), SetAddrResult::Succeed),
-            SetAddrResult::ParseAddrFailed => (m.transition(SetAddrFailed).as_enum(), SetAddrResult::ParseAddrFailed),
+        let result = self.do_set_addr(addr);
+        let transition = match result {
+            SetAddrResult::Succeed => m.transition(SetAddrSucceed).as_enum(),
+            SetAddrResult::ParseAddrFailed => m.transition(SetAddrFailed).as_enum(),
+            SetAddrResult::InvalidState => m.transition(SetAddrFailed).as_enum(),
         }
+
+        (transition, result)
     }
     
     fn set_addr_on_init_by_set_addr_failed(&mut self, m: Machine<Init, SetAddrFailed>, addr: &str) -> (Variant, SetAddrResult) {
         trace!("set_addr_on_init_by_set_addr_failed");
 
-        match self.do_set_addr(addr) {
-            SetAddrResult::Succeed => (m.transition(SetAddrSucceed).as_enum(), SetAddrResult::Succeed),
-            SetAddrResult::ParseAddrFailed => (m.transition(SetAddrFailed).as_enum(), SetAddrResult::ParseAddrFailed),
+        let result = self.do_set_addr(addr);
+        let transition = match result {
+            SetAddrResult::Succeed => m.transition(SetAddrSucceed).as_enum(),
+            SetAddrResult::ParseAddrFailed => m.transition(SetAddrFailed).as_enum(),
+            SetAddrResult::InvalidState => m.transition(SetAddrFailed).as_enum(),
         }
+
+        (transition, result)
     }
 
 }
