@@ -31,6 +31,14 @@
             "program": "${workspaceRoot}/target/debug/rbtc_nodewalker",
             "args": [],
             "cwd": "${workspaceFolder}/target/debug/"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug program 'rbtc_cli'",
+            "program": "${workspaceRoot}/target/debug/rbtc_cli",
+            "args": [],
+            "cwd": "${workspaceFolder}/target/debug/"
         }
     ]
 }

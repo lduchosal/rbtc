@@ -1,5 +1,7 @@
 extern crate sm;
 
+use std::sync::mpsc::SendError;
+use std::sync::mpsc::RecvError;
 use crate::cli::*;
 use crate::cli::result::*;
 
@@ -37,46 +39,58 @@ enum Request {
     SetAddr(String)
 }
 
-enum Response {}
+enum Response {
+    SetAddr(bool)
+}
 
 
 pub struct RbtcPool {
     pool: threadpool::ThreadPool,
+    send: mpsc::Sender<Request>,
+    recv: mpsc::Receiver<Response>,
 }
 
 impl RbtcPool {
     
-    fn new() -> RbtcPool {
+    pub fn new() -> RbtcPool {
+
+        trace!("new");
 
         let pool = ThreadPool::new(2);
-        RbtcPool {
-            pool: pool,
-        }
-    }
+ 
+        let (send_request, rcv_request) = channel::<Request>();
+        let (send_response, rcv_response) = channel::<Response>();
 
-    fn run(&mut self) -> (mpsc::Sender<Request>, mpsc::Receviver<Request>) {
+        pool.execute(move || {
 
-        let (send_request, rcv_request): (mpsc::Sender<Request>, mpsc::Receviver<Request>) = channel();
-        let (send_response, rcv_response): (mpsc::Sender<Response>, mpsc::Receviver<Response>) = channel();
+            println!("pool.execute");
 
-        trace!("run");
-        
-        let query = (send_request.clone(), rcv_response);
-
-        self.pool.execute(move || {
-
-            let rbtc = Rbtc::new(query);
+            let mut rbtc = Rbtc::new(rcv_request, send_response);
             let mut fsm = Machine::new(Init).as_enum();
-            while let Ok(request) = rcv_request.recv() {
+            while let Ok(request) = rbtc.recv() {
+
+                println!("rbtc.recv");
                 fsm = match request {
                     Request::SetAddr(ref addr) => rbtc.set_addr(fsm, addr),
                 }
             }
         });
-        
+
+        RbtcPool {
+            pool: pool,
+            send: send_request,
+            recv: rcv_response
+        }
     }
 
-    fn join(&mut self) {
+    pub fn set_addr(&mut self, addr: String) {
+
+        println!("set_addr");
+        let request = Request::SetAddr(addr);
+        self.send.send(request);
+    }
+
+    pub fn join(&mut self) {
         self.pool.join();
     }
 
@@ -92,14 +106,15 @@ pub struct Rbtc {
     addr: Option<SocketAddr>,
     stream: Option<TcpStream>,
 
-    query: (mpsc::Sender<Request>, mpsc::Receiver<Response>)
+    recv: mpsc::Receiver<Request>,
+    send: mpsc::Sender<Response>,
 }
 
 trait RbtcFsmEvents {
 
     // Init
-    fn set_addr_on_init_by_none_event(&mut self, m: Machine<Init, NoneEvent>, addr: &str) -> Variant;
-    fn set_addr_on_init_by_set_addr_failed(&mut self, m: Machine<Init, SetAddrFailed>, addr: &str) -> Variant;
+    fn set_addr_on_init_by_none_event(&mut self, m: Machine<Init, NoneEvent>, addr: &str) -> (Variant, SetAddrResult);
+    fn set_addr_on_init_by_set_addr_failed(&mut self, m: Machine<Init, SetAddrFailed>, addr: &str) -> (Variant, SetAddrResult);
 }
 
 trait RbtcInternal {
@@ -109,7 +124,16 @@ trait RbtcInternal {
 
 impl Rbtc {
 
-    fn new(query: (mpsc::Sender<Request>, mpsc::Receiver<Response>)) -> Rbtc {
+    fn recv(&self) -> Result<Request, RecvError> {
+        self.recv.recv()
+    }
+
+    fn send(&self, response: Response) -> Result<(), SendError<Response>> {
+        self.send.send(response)
+    }
+
+    fn new(recv: mpsc::Receiver<Request>, send: mpsc::Sender<Response>) -> Rbtc {
+        println!("new");
 
         let node_ip_port = "127.0.0.1:8333".to_string();
 
@@ -119,44 +143,53 @@ impl Rbtc {
             node_ip_port: node_ip_port,
             addr: None,
             stream: None,
-            query: query
+            recv: recv,
+            send: send
         }
     }
     
 
     fn set_addr(&mut self, fsm: RbtcFsm::Variant, addr: &str) -> RbtcFsm::Variant {
+        println!("set_addr");
 
-        match fsm {
+        let (variant, result) = match fsm {
             InitialInit(m) => self.set_addr_on_init_by_none_event(m, addr),
             InitBySetAddrFailed(m) => self.set_addr_on_init_by_set_addr_failed(m, addr),
-            _ => fsm,
+            _ => (fsm, SetAddrResult::InvalidState),
+        };
+
+        match result {
+            SetAddrResult::Succeed => ,
+            SetAddrResult::ParseAddrFailed => ,
+            SetAddrResult::InvalidState => ,
         }
+
+        variant
     }
 }
 
 impl RbtcFsmEvents for Rbtc  {
 
 
-    fn set_addr_on_init_by_none_event(&mut self, m: Machine<Init, NoneEvent>, addr: &str) -> Variant {
-        trace!("set_addr_on_init_by_none_event");
+    fn set_addr_on_init_by_none_event(&mut self, m: Machine<Init, NoneEvent>, addr: &str) -> (Variant, SetAddrResult)  {
+        println!("set_addr_on_init_by_none_event");
 
         match self.do_set_addr(addr) {
-            SetAddrResult::Succeed => m.transition(SetAddrSucceed).as_enum(),
-            SetAddrResult::ParseAddrFailed => m.transition(SetAddrFailed).as_enum(),
+            SetAddrResult::Succeed => (m.transition(SetAddrSucceed).as_enum(), SetAddrResult::Succeed),
+            SetAddrResult::ParseAddrFailed => (m.transition(SetAddrFailed).as_enum(), SetAddrResult::ParseAddrFailed),
         }
     }
     
-    fn set_addr_on_init_by_set_addr_failed(&mut self, m: Machine<Init, SetAddrFailed>, addr: &str) -> Variant {
+    fn set_addr_on_init_by_set_addr_failed(&mut self, m: Machine<Init, SetAddrFailed>, addr: &str) -> (Variant, SetAddrResult) {
         trace!("set_addr_on_init_by_set_addr_failed");
 
         match self.do_set_addr(addr) {
-            SetAddrResult::Succeed => m.transition(SetAddrSucceed).as_enum(),
-            SetAddrResult::ParseAddrFailed => m.transition(SetAddrFailed).as_enum(),
+            SetAddrResult::Succeed => (m.transition(SetAddrSucceed).as_enum(), SetAddrResult::Succeed),
+            SetAddrResult::ParseAddrFailed => (m.transition(SetAddrFailed).as_enum(), SetAddrResult::ParseAddrFailed),
         }
     }
 
 }
-
 
 impl RbtcInternal for Rbtc {
 
@@ -180,12 +213,13 @@ impl RbtcInternal for Rbtc {
         node_ip_port.push_str(":8333");
         match node_ip_port.parse() {
             Ok(addr) => {
+                trace!("do_set_addr [ok]");
                 self.addr = Some(addr);
                 SetAddrResult::Succeed
             },
             Err(err) => {
-                warn!("set_addr [err: {}]", err);
-                warn!("set_addr [node_ip_port: {}]", node_ip_port);
+                warn!("do_set_addr [err: {}]", err);
+                warn!("do_set_addr [node_ip_port: {}]", node_ip_port);
                 SetAddrResult::ParseAddrFailed
             }
         }

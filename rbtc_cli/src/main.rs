@@ -2,10 +2,14 @@ extern crate copperline;
 extern crate encoding;
 extern crate rbtc;
 
-use std::process::exit;
 use copperline::Encoding::Utf8;
 use copperline::Copperline;
 use rbtc::cli::rbtc::RbtcPool;
+
+use std::process::exit;
+use std::sync::mpsc::channel;
+use std::sync::mpsc;
+
 
 enum Command {
     Help,
@@ -13,16 +17,14 @@ enum Command {
     SetAddr
 }
 
-
 fn main() {
 
-    let cli = RbtcCli::new();
+    let mut cli = RbtcCli::new();
     cli.run();
 }
 
-
 struct RbtcCli {
-    rbtcpool: RbtcPool
+    rbtcpool: RbtcPool,
 }
 
 impl RbtcCli {
@@ -31,13 +33,12 @@ impl RbtcCli {
 
         let rbtcpool = RbtcPool::new();
         RbtcCli {
-            rbtcpool: rbtcpool
+            rbtcpool: rbtcpool,
         }
     }
 
-    fn run(&self) {
+    fn run(&mut self) {
 
-        self.rbtcpool.run();
         let mut cl = Copperline::new();
         while let Ok(line) = cl.read_line("rbtc> ", Utf8) {
             self.action(&line);
@@ -45,7 +46,7 @@ impl RbtcCli {
         };
     }
 
-    fn action(&self, line: &str) {
+    fn action(&mut self, line: &str) {
 
         let tokens: Vec<&str> = line.split(" ").collect();
         let first = match tokens.get(0) {
@@ -70,10 +71,9 @@ impl RbtcCli {
         };
     }
 
-    fn set_addr(&self, line: &str) {
+    fn set_addr(&mut self, line: &str) {
 
-        println!("rbtc: {}", line);
-        let addrs: Vec<&str> = line.split(" ").collect();
+        let mut addrs: Vec<&str> = line.split(" ").collect();
         addrs.remove(0);
 
         match addrs.get(0) {
@@ -82,7 +82,8 @@ impl RbtcCli {
                 return;
             },
             Some(addr) => {
-                self.rbtc.set_addr(addr);
+                println!(" setaddr");
+                self.rbtcpool.set_addr(addr.to_string());
             }
         };
 
