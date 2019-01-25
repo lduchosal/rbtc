@@ -158,11 +158,14 @@ impl Rbtc {
             _ => (fsm, SetAddrResult::InvalidState),
         };
 
-        match result {
-            SetAddrResult::Succeed => ,
-            SetAddrResult::ParseAddrFailed => ,
-            SetAddrResult::InvalidState => ,
-        }
+        let succeed = match result {
+            SetAddrResult::Succeed => true,
+            SetAddrResult::ParseAddrFailed => false,
+            SetAddrResult::InvalidState => false,
+        };
+        
+        let response = Response::SetAddr(succeed);
+        self.send(response);
 
         variant
     }
