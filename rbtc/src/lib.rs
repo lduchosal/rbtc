@@ -10,6 +10,12 @@ extern crate log;
 #[macro_use]
 extern crate bitflags;
 
+#[macro_use] 
+extern crate microstate;
+
+#[macro_use]
+extern crate futures;
+
 pub mod network;
 pub mod block;
 pub mod utils;

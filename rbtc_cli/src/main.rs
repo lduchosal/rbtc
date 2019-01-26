@@ -4,7 +4,7 @@ extern crate rbtc;
 
 use copperline::Encoding::Utf8;
 use copperline::Copperline;
-use rbtc::cli::rbtc::RbtcPool;
+use rbtc::cli::rbtc::Rbtc;
 
 use std::process::exit;
 use std::sync::mpsc::channel;
@@ -24,16 +24,16 @@ fn main() {
 }
 
 struct RbtcCli {
-    rbtcpool: RbtcPool,
+    rbtc: Rbtc,
 }
 
 impl RbtcCli {
 
     fn new() -> RbtcCli {
 
-        let rbtcpool = RbtcPool::new();
+        let rbtc = Rbtc::new();
         RbtcCli {
-            rbtcpool: rbtcpool,
+            rbtc: rbtc,
         }
     }
 
@@ -82,8 +82,11 @@ impl RbtcCli {
                 return;
             },
             Some(addr) => {
-                println!(" setaddr");
-                self.rbtcpool.set_addr(addr.to_string());
+                println!("setaddr");
+                match self.rbtc.set_addr(addr.to_string()) {
+                    Ok(()) => println!("setaddr OK"),
+                    Err(()) => println!("setaddr Err")
+                }
             }
         };
 
