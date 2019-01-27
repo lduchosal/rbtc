@@ -6,7 +6,7 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use rbtc::cli::rbtc::Rbtc;
 
-use std::sync::mpsc::{TryRecvError};
+use futures::future::Future;
 
 
 enum Command {
@@ -65,9 +65,7 @@ impl RbtcCli {
                     break
                 }
             }
-            self.try_recv();
         }
-
         rl.save_history("history.txt").unwrap();
     }
 
@@ -97,26 +95,6 @@ impl RbtcCli {
 
         command
     }
-    
-    fn try_recv(&mut self) {
-        let mut i = 0;
-        loop {
-             match self.rbtc.try_recv() {
-                Ok(recv) => { 
-                    println!("try_recv: [rcv: {:#?}]", recv); 
-                    break; 
-                },
-                Err(TryRecvError::Empty) => { 
-                    std::thread::sleep_ms(5);
-                    if i > 2 {
-                        break; 
-                    }
-                }
-                Err(err) => println!("try_recv: [err: {:#?}]", err),
-            }
-            i += 1;
-        }
-    }
 
     fn set_addr(&mut self, line: &str) {
 
@@ -129,9 +107,9 @@ impl RbtcCli {
             },
             Some(addr) => {
                 println!("setaddr");
-                match self.rbtc.set_addr(addr.to_string()) {
-                    Ok(()) => println!("setaddr OK"),
-                    Err(()) => println!("setaddr Err")
+                match self.rbtc.set_addr(addr.to_string()).wait() {
+                    Ok(result) => println!("setaddr [result: {}]", result),
+                    Err(err) => println!("setaddr [err: {:#?}]", err),
                 }
             }
         };

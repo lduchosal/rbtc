@@ -11,22 +11,25 @@ use std::io::{Cursor};
 
 use std::time;
 use std::thread;
-use futures::sync::mpsc::{channel, Receiver, Sender};
-use futures::{Sink, Future};
-
-#[derive(Debug)]
-pub enum Request {
-    SetAddr(String)
-}
-
-#[derive(Debug)]
-pub enum Response {
-    SetAddr(bool)
-}
+use futures::sync::mpsc;
+use futures::sync::oneshot;
+use futures::{Sink, Future, Stream};
 
 pub struct Rbtc {
-    send: Sender<Request>,
-    recv: Receiver<Response>,
+    send: mpsc::Sender<Request>,
+}
+
+pub enum Request {
+    SetAddr(SetAddrRequest)
+}
+
+pub struct SetAddrRequest {
+    pub addr: String,
+    pub sender: oneshot::Sender<SetAddrResponse>
+}
+
+pub struct SetAddrResponse {
+    pub result: bool,
 }
 
 impl Rbtc {
@@ -35,30 +38,34 @@ impl Rbtc {
 
         trace!("new");
 
-        let (send_request, rcv_request) = channel::<Request>(1);
-        let (send_response, rcv_response) = channel::<Response>(1);
+        let (send_request, rcv_request) = mpsc::channel::<Request>(1);
 
         std::thread::spawn(move || {
             println!("pool.spawn");
-            let worker = Worker::new(rcv_request, send_response);
+            let worker = Worker::new(rcv_request);
             tokio::run(worker);
         });
 
         Rbtc {
             send: send_request,
-            recv: rcv_response
         }
     }
 
-    pub fn set_addr(&mut self, addr: String) -> Result<(), ()> {
+    pub fn set_addr(&mut self, addr: String) -> impl Future<Item=bool, Error=oneshot::Canceled> {
+        let (sender, response) = oneshot::channel::<SetAddrResponse>();
 
         println!("set_addr");
-        let request = Request::SetAddr(addr);
+        let setaddr = SetAddrRequest {
+            addr: addr,
+            sender: sender
+        };
+        let request = Request::SetAddr(setaddr);
         self.send.clone()
             .send(request)
             .wait()
-            .map(|_sender| ())
-            .map_err(|_err| ())
-            
+            ;
+        
+        response.map(|res| res.result)
     }
+
 }

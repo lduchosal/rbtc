@@ -37,7 +37,6 @@ pub struct Worker {
     stream: Option<TcpStream>,
 
     recv: Receiver<Request>,
-    send: Sender<Response>,
 
 }
 
@@ -47,7 +46,7 @@ impl Worker {
         self.state.state()
     }
 
-    pub(crate) fn new(recv: Receiver<Request>, send: Sender<Response>) -> Worker {
+    pub(crate) fn new(recv: Receiver<Request>) -> Worker {
 
         println!("new");
 
@@ -63,37 +62,40 @@ impl Worker {
             stream: None,
             
             recv: recv,
-            send: send
         }
     }
 
-    pub fn set_addr(&mut self, addr: &str) {
+    pub fn set_addr(&mut self, request: SetAddrRequest) {
 
-        trace!("do_set_addr");
-        debug!("do_set_addr [addr: {}]", addr);
+        trace!("set_addr");
+        debug!("set_addr [addr: {}]", request.addr);
 
-        let mut node_ip_port = addr.to_string();
-        let mut result = SetAddrResult::ParseAddrFailed;
+        let mut node_ip_port = request.addr.to_string();
 
-        if let Ok(addr) = node_ip_port.parse() {
-            self.addr = Some(addr);
-            result = SetAddrResult::Succeed;
-        } 
-        else {
-            node_ip_port.push_str(":8333");
-            result = match node_ip_port.parse() {
-                Ok(addr) => {
-                    trace!("do_set_addr [ok]");
-                    self.addr = Some(addr);
-                    SetAddrResult::Succeed
-                },
-                Err(err) => {
-                    warn!("do_set_addr [err: {}]", err);
-                    warn!("do_set_addr [node_ip_port: {}]", node_ip_port);
-                    SetAddrResult::ParseAddrFailed
+        let response = match node_ip_port.parse() {
+            Ok(addr) => {
+                self.addr = Some(addr);
+                SetAddrResponse { result: true }
+            },
+            Err(_) => {
+                
+                node_ip_port.push_str(":8333");
+                match node_ip_port.parse() {
+                    Ok(addr) => {
+                        trace!("set_addr [ok]");
+                        self.addr = Some(addr);
+                        SetAddrResponse { result: true }
+                    },
+                    Err(err) => {
+                        warn!("set_addr [err: {}]", err);
+                        warn!("set_addr [node_ip_port: {}]", node_ip_port);
+                        SetAddrResponse { result: false }
+                    }
                 }
             }
-        }
+        }; 
+        request.sender.send(response);
+
     }
 }
 
@@ -114,11 +116,9 @@ impl Future for Worker {
         loop {
             match self.recv.poll() {
                 Ok(Async::Ready(Some(request))) => {
-                    println!("Async::Ready(Some) {:#?}", request);
+                    println!("Async::Ready(Some)");
                     let next = match request {
-                        Request::SetAddr(ref addr) => {
-                            self.set_addr(addr)
-                        }
+                        Request::SetAddr(setaddr) => self.set_addr(setaddr)
                     };
                 },
                 Ok(Async::Ready(None)) => {
