@@ -1,4 +1,5 @@
 
+use std::net::AddrParseError;
 use std::sync::mpsc::SendError;
 use std::sync::mpsc::RecvError;
 use crate::cli::*;
@@ -11,6 +12,7 @@ use std::io::{Cursor};
 
 use std::time;
 use std::thread;
+use futures::future::lazy;
 use futures::sync::mpsc;
 use futures::sync::oneshot;
 use futures::{Sink, Future, Stream};
@@ -20,16 +22,26 @@ pub struct Rbtc {
 }
 
 pub enum Request {
-    SetAddr(SetAddrRequest)
+    SetAddr(SetAddrRequest),
+    Connect(ConnectRequest)
 }
 
+#[derive(Debug)]
 pub struct SetAddrRequest {
     pub addr: String,
-    pub sender: oneshot::Sender<SetAddrResponse>
+    pub sender: oneshot::Sender<Result<(), Error>>
 }
 
-pub struct SetAddrResponse {
-    pub result: bool,
+#[derive(Debug)]
+pub struct ConnectRequest {
+    pub sender: oneshot::Sender<Result<(), Error>>
+}
+
+#[derive(Debug)]
+pub enum Error {
+    None,
+    SetAddrResponseFailed(String),
+    CommectFailed(String),
 }
 
 impl Rbtc {
@@ -41,7 +53,7 @@ impl Rbtc {
         let (send_request, rcv_request) = mpsc::channel::<Request>(1);
 
         std::thread::spawn(move || {
-            println!("pool.spawn");
+            println!("worker.spawn");
             let worker = Worker::new(rcv_request);
             tokio::run(worker);
         });
@@ -51,8 +63,8 @@ impl Rbtc {
         }
     }
 
-    pub fn set_addr(&mut self, addr: String) -> impl Future<Item=bool, Error=oneshot::Canceled> {
-        let (sender, response) = oneshot::channel::<SetAddrResponse>();
+    pub fn set_addr(&mut self, addr: String) -> impl Future<Item=Result<(), Error>, Error=oneshot::Canceled> {
+        let (sender, response) = oneshot::channel::<Result<(), Error>>();
 
         println!("set_addr");
         let setaddr = SetAddrRequest {
@@ -60,12 +72,39 @@ impl Rbtc {
             sender: sender
         };
         let request = Request::SetAddr(setaddr);
-        self.send.clone()
+        let sent = self.send.clone()
             .send(request)
             .wait()
             ;
         
-        response.map(|res| res.result)
+        match sent {
+            Ok(_) => {},
+            Err(err) => println!("set_addr [err: {}]", err)
+        };
+
+        response
+    }
+
+
+    pub fn connect(&mut self) -> impl Future<Item=Result<(), Error>, Error=oneshot::Canceled> {
+        let (sender, response) = oneshot::channel::<Result<(), Error>>();
+
+        println!("connect");
+        let connect = ConnectRequest {
+            sender: sender
+        };
+        let request = Request::Connect(connect);
+        let sent = self.send.clone()
+            .send(request)
+            .wait()
+            ;
+        
+        match sent {
+            Ok(_) => {},
+            Err(err) => println!("connect [err: {}]", err)
+        };
+
+        response
     }
 
 }

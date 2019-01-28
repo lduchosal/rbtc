@@ -32,3 +32,33 @@ connect
 .
 ?
 setaddr 127.0.0.1:8333
+.
+?
+setaddr 127.0.0.1:8333
+.
+setaddr 127.0.0.1:8333
+,
+.
+a
+setaddr 127.0.0.1:8333
+setaddr 127.0.0.1:asda
+setaddr 127.0.0.1:8333
+setaddr 1273.0.0.1:8333
+.
+setaddr 1273.0.0.1:8333
+setaddr 127.0.0.1:8333
+c
+a
+setaddr 127.0.0.1:8333
+quit
+setaddr 127.0.0.1:8333
+c
+setaddr 127.0.0.1:8333
+c
+setaddr 127.0.0.1:8333
+c
+setaddr 127.0.0.1:8333
+c
+quit
+setaddr 127.0.0.1:8333
+c

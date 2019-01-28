@@ -13,7 +13,8 @@ enum Command {
     Help,
     Quit,
     SetAddr,
-    Empty
+    Empty,
+    Connect
 }
 
 fn main() {
@@ -79,8 +80,9 @@ impl RbtcCli {
 
         let command = match first {
             "q" | "quit" | "exit" => Ok(Command::Quit),
-            "a" | "setaddr" | "addr" => Ok(Command::SetAddr),
             "." | "?" | "h" | "help"  => Ok(Command::Help),
+            "a" | "setaddr" | "addr" => Ok(Command::SetAddr),
+            "c" | "connect" | "conn" => Ok(Command::Connect),
             "" => Ok(Command::Empty),
             _ => Err(line.to_string()),
         };
@@ -89,6 +91,7 @@ impl RbtcCli {
             Ok(Command::Help) => self.help(),
             Ok(Command::Quit) => self.quit(),
             Ok(Command::SetAddr) => self.set_addr(line),
+            Ok(Command::Connect) => self.connect(),
             Ok(Command::Empty) => {},
             Err(s) => self.err(s.clone()),
         };
@@ -108,12 +111,21 @@ impl RbtcCli {
             Some(addr) => {
                 println!("setaddr");
                 match self.rbtc.set_addr(addr.to_string()).wait() {
-                    Ok(result) => println!("setaddr [result: {}]", result),
+                    Ok(result) => println!("setaddr [result: {:#?}]", result),
                     Err(err) => println!("setaddr [err: {:#?}]", err),
                 }
             }
         };
 
+    }
+
+    fn connect(&mut self) {
+
+        println!("connect");
+        match self.rbtc.connect().wait() {
+            Ok(result) => println!("connect [result: {:#?}]", result),
+            Err(err) => println!("connect [err: {:#?}]", err),
+        };
     }
 
     fn help(&self) {
