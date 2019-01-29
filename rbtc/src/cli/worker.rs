@@ -3,6 +3,7 @@ use tokio::codec::length_delimited;
 use tokio::codec::Framed;
 use tokio::io::{AsyncWrite, AsyncRead};
 use tokio::net::{TcpStream, tcp::ConnectFuture};
+use tokio::prelude::task::Spawn;
 
 use futures::{Future, Async, Poll, Sink, Stream};
 use futures::future::lazy;
@@ -138,17 +139,16 @@ impl Worker {
 
     fn set_addr(&mut self, request: SetAddrRequest) -> Result<(), ()>{
 
-        println!("set_addr [request: {:#?}]", request);
+        println!("Worker set_addr [request: {:#?}]", request);
 
         let (sender, response) = std::sync::mpsc::channel::<Result<SocketAddr, Error>>();
         let setaddr = SetAddrWorker {
             addr: request.addr,
             result: sender,
         };
-        let curr = tokio::executor::current_thread::task_executor();
-        println!("set_addr [curr: {:#?}]", curr);
+
         let spawn = tokio::spawn(setaddr);
-        println!("set_addr [spawn: {:#?}]", spawn);
+        println!("Worker set_addr [spawn: {:#?}]", spawn);
         
         let result = match response.recv() {
             Ok(Ok(addr)) => {
@@ -164,9 +164,9 @@ impl Worker {
             }
         };
 
-        println!("set_addr [result: {:#?}]", result);
+        println!("Worker set_addr [result: {:#?}]", result);
         let sent = request.sender.send(result);
-        println!("set_addr [sent: {:#?}]", sent);
+        println!("Worker set_addr [sent: {:#?}]", sent);
 
         Ok(())
     }
@@ -284,6 +284,8 @@ impl Future for Worker {
                 },
                 Ok(Async::Ready(None)) => {
                     println!("Worker Async::Ready(None)");
+                    //futures::task::current().notify();
+                    //return Ok(Async::NotReady);
                 },
                 Ok(Async::NotReady) => {
                     println!("Worker Async::NotReady");
