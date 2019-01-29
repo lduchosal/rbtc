@@ -21,6 +21,7 @@ pub struct Rbtc {
     send: mpsc::Sender<Request>,
 }
 
+#[derive(Debug)]
 pub enum Request {
     SetAddr(SetAddrRequest),
     Connect(ConnectRequest)

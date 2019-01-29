@@ -62,3 +62,9 @@ c
 quit
 setaddr 127.0.0.1:8333
 c
+setaddr 127.0.0.1:8333
+c
+.
+?
+setaddr 127.0.0.1:8333
+setaddr 127.0.0.1

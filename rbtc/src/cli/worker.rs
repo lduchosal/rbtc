@@ -6,8 +6,8 @@ use tokio::net::{TcpStream, tcp::ConnectFuture};
 
 use futures::{Future, Async, Poll, Sink, Stream};
 use futures::future::lazy;
-use futures::sync::mpsc::{Receiver, Sender};
-use futures::sync::oneshot;
+use futures::future::Executor;
+use futures::sync::mpsc::{channel, Receiver, Sender};
 
 use crate::cli::*;
 use crate::cli::result::*;
@@ -28,6 +28,7 @@ microstate!{
 
     set_addr {
         Init => SettingAddr
+        SetAddr => SettingAddr
     }
 
     connect {
@@ -64,7 +65,7 @@ pub struct Worker {
 
 struct SetAddrWorker {
     addr: String,
-    result: oneshot::Sender<Result<SocketAddr, Error>>,
+    result: std::sync::mpsc::Sender<Result<SocketAddr, Error>>,
 }
 
 struct Connect {
@@ -98,10 +99,17 @@ impl Worker {
 
     fn change_state(&mut self, request: Request) {
 
+        println!("change_state");
+        println!("change_state [request: {:#?}]", request);
+        println!("change_state [state: {:#?}]", self.state);
+
         let next = match request {
             Request::SetAddr(_) => self.state.set_addr(),
             Request::Connect(_) => self.state.connect(),
         };
+
+        println!("change_state [next: {:#?}]", next);
+        println!("change_state [state: {:#?}]", self.state);
 
         match next {
             None => {},
@@ -109,10 +117,11 @@ impl Worker {
             Some(State::SettingAddr) => {
                 match request {
                     Request::SetAddr(setaddr) => {
-                        match self.set_addr(setaddr) {
+                        let setaddr = match self.set_addr(setaddr) {
                             Ok(_) => self.state.succeed(),
                             Err(_) => self.state.failed(),
                         };
+                        println!("change_state [setaddr: {:#?}]", setaddr);
                     },
                     _ => {}
                 }
@@ -123,32 +132,43 @@ impl Worker {
             Some(State::__InvalidState__) => {}
         };
 
+        println!("change_state [state: {:#?}]", self.state);
+
     }
 
     fn set_addr(&mut self, request: SetAddrRequest) -> Result<(), ()>{
 
-        let (sender, response) = oneshot::channel::<Result<SocketAddr, Error>>();
+        println!("set_addr [request: {:#?}]", request);
+
+        let (sender, response) = std::sync::mpsc::channel::<Result<SocketAddr, Error>>();
         let setaddr = SetAddrWorker {
             addr: request.addr,
             result: sender,
         };
-        tokio::spawn(setaddr);
+        let curr = tokio::executor::current_thread::task_executor();
+        println!("set_addr [curr: {:#?}]", curr);
+        let spawn = tokio::spawn(setaddr);
+        println!("set_addr [spawn: {:#?}]", spawn);
         
-        match response.wait() {
+        let result = match response.recv() {
             Ok(Ok(addr)) => {
                 self.addr = Some(addr);
-                request.sender.send(Ok(()));
                 Ok(())
             },
             Ok(Err(err)) => {
-                request.sender.send(Err(Error::SetAddrResponseFailed("set_addr err".to_string())));
-                Err(())
+                let error = format!("{:#?}", err);
+                Err(Error::SetAddrResponseFailed(error))
             },
             Err(err) => {
-                request.sender.send(Err(Error::SetAddrResponseFailed(err.to_string())));
-                Err(())
+                Err(Error::SetAddrResponseFailed(err.to_string()))
             }
-        }
+        };
+
+        println!("set_addr [result: {:#?}]", result);
+        let sent = request.sender.send(result);
+        println!("set_addr [sent: {:#?}]", sent);
+
+        Ok(())
     }
 
     fn connect(&mut self, request: ConnectRequest) -> Poll<(), ()> {
@@ -194,8 +214,10 @@ impl Worker {
                 }
             }
         };
+        println!("connect [response: {:#?}]", response);
 
         let sent = request.sender.send(response);
+        println!("connect [sent: {:#?}]", sent);
         Ok(Async::Ready(()))
     }
 
@@ -207,13 +229,14 @@ impl Future for SetAddrWorker {
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
 
-        trace!("poll");
-        debug!("poll [addr: {}]", self.addr);
+        println!("SetAddrWorker poll");
+        println!("SetAddrWorker poll [addr: {}]", self.addr);
 
         let mut node_ip_port = self.addr.to_string();
 
         let result = match node_ip_port.parse() {
             Ok(addr) => {
+                println!("SetAddrWorker poll [ok1]");
                 Ok(addr)
             },
             Err(_) => {
@@ -221,19 +244,21 @@ impl Future for SetAddrWorker {
                 node_ip_port.push_str(":8333");
                 match node_ip_port.parse() {
                     Ok(addr) => {
-                        trace!("set_addr [ok]");
+                        println!("SetAddrWorker poll [ok2]");
                         Ok(addr)
                     },
                     Err(err) => {
-                        warn!("set_addr [err: {}]", err);
-                        warn!("set_addr [node_ip_port: {}]", node_ip_port);
+                        println!("SetAddrWorker poll [err: {}]", err);
+                        println!("SetAddrWorker poll [node_ip_port: {}]", node_ip_port);
                         let sockerr: AddrParseError = err;
                         Err(Error::SetAddrResponseFailed(sockerr.to_string()))
                     }
                 }
             }
         };
-        self.result.send(result);
+        let sent = self.result.send(result);
+        println!("SetAddrWorker poll [sent: {:#?}]", sent);
+
         Ok(Async::Ready(()))
     }
 }
@@ -270,6 +295,7 @@ impl Future for Worker {
                 }
             }
         }
+        println!("Worker end");
 
         Ok(Async::Ready(()))
     }
