@@ -16,6 +16,8 @@ extern crate microstate;
 #[macro_use]
 extern crate futures;
 
+extern crate tokio;
+
 pub mod network;
 pub mod block;
 pub mod utils;

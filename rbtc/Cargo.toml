@@ -18,5 +18,6 @@ threadpool = "1.7.1"
 
 futures = "0.1.25"
 tokio = "0.1.15"
+tokio-core = "0.1.17"
 bytes = "0.4.11"
 mio = "0.6.16"

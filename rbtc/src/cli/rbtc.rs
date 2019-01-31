@@ -12,6 +12,8 @@ use std::io::{Cursor};
 
 use std::time;
 use std::thread;
+
+
 use futures::future::lazy;
 use futures::sync::mpsc;
 use futures::sync::oneshot;
@@ -55,8 +57,17 @@ impl Rbtc {
 
         std::thread::spawn(move || {
             println!("worker.spawn");
+
+            let mut rt = tokio::runtime::Builder::new()
+                .core_threads(4)
+                .build()
+                .unwrap();
+
             let worker = Worker::new(rcv_request);
-            tokio::run(worker);
+            //rt.spawn(worker);
+
+            rt.block_on_all(worker).unwrap();
+            println!("worker.ended");
         });
 
         Rbtc {
