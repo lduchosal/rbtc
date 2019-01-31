@@ -37,7 +37,7 @@ impl RbtcCli {
         }
     }
 
-    fn run(&mut self) {
+    fn run2(&mut self) {
 
         let mut rl = Editor::<()>::new();
         if rl.load_history("history.txt").is_err() {
@@ -68,6 +68,20 @@ impl RbtcCli {
             }
         }
         rl.save_history("history.txt").unwrap();
+    }
+
+    fn run(&mut self) {
+
+        loop {
+            std::thread::sleep_ms(500);
+            let line = "setaddr 127.0.0.1:8333";
+            if let Ok(command) = self.action(&line) {
+                match command {
+                    Command::Quit => break,
+                    _ => {}
+                }
+            }
+        }
     }
 
     fn action(&mut self, line: &str) -> Result<Command, String> {

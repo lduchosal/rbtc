@@ -145,8 +145,6 @@ impl Worker {
             addr: request.addr,
             result: sender,
         };
-        let curr = tokio::executor::current_thread::task_executor();
-        println!("set_addr [curr: {:#?}]", curr);
         let spawn = tokio::spawn(setaddr);
         println!("set_addr [spawn: {:#?}]", spawn);
         
@@ -163,6 +161,8 @@ impl Worker {
                 Err(Error::SetAddrResponseFailed(err.to_string()))
             }
         };
+
+        drop(response);
 
         println!("set_addr [result: {:#?}]", result);
         let sent = request.sender.send(result);

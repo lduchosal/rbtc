@@ -1,44 +1,77 @@
-extern crate chrono;
-extern crate rayon;
-extern crate rand;
-extern crate pretty_env_logger;
-#[macro_use] extern crate log;
-
-pub mod config;
-pub mod resolver;
-pub mod provider;
-pub mod node;
-pub mod walker;
-pub mod program;
-pub mod message;
-
-use std::path::Path;
+use mio::*;
+use mio::net::{TcpListener, TcpStream};
+use std::io::{Read, Write, Cursor};
+// Setup some tokens to allow us to identify which event is
+// for which socket.
+const SERVER: Token = Token(0);
+const CLIENT: Token = Token(1);
 
 fn main() {
 
-    pretty_env_logger::init();
+    println!("main");
 
-    info!("rbtc_nodewalker 0.4.0 (q)");
+    let addr = "127.0.0.1:13265".parse().unwrap();
 
-    let config = config::Config {
-        dns_seeds: vec![
-            String::from("seed.bitcoin.sipa.be"),
-            String::from("dnsseed.bluematt.me"),
-            String::from("dnsseed.bitcoin.dashjr.org"),
-            String::from("seed.bitcoinstats.com"),
-            String::from("seed.bitcoin.jonasschnelli.ch"),
-            String::from("seed.btc.petertodd.org"),
-            String::from("seed.bitcoin.sprovoost.nl"),
-        ],
-        sqlite_path: Path::new("./nodes.sqlite"),
-    };
+    // Setup the server socket
+    let server = TcpListener::bind(&addr).unwrap();
 
-    let resolver = resolver::Resolver::new(config.dns_seeds);
-    let provider = provider::NodeProvider::new(&config.sqlite_path).unwrap();
+    // Create a poll instance
+    let poll = Poll::new().unwrap();
 
-    let mut program = program::Program::new(
-        resolver,
-        provider
-    );
-    program.run();
+    // Start listening for incoming connections
+    poll.register(&server, SERVER, Ready::all(),
+                PollOpt::edge()).unwrap();
+
+    // Setup the client socket
+    let mut sock = TcpStream::connect(&addr).unwrap();
+
+    // Register the socket
+    poll.register(&sock, CLIENT, Ready::all(),
+                PollOpt::edge()).unwrap();
+
+    // Create storage for events
+    let mut events = Events::with_capacity(1024);
+
+    loop {
+        poll.poll(&mut events, None).unwrap();
+
+        for event in events.iter() {
+            match event.token() {
+                SERVER => {
+
+                    println!("Server");
+                    // Accept and drop the socket immediately, this will close
+                    // the socket and notify the client of the EOF.
+                    let accept = server.accept();
+                    println!("event : {:#?}", event);
+                    match accept {
+                        Err(err) => println!("Error with accept"),
+                        Ok((mut stream, addr))  => {
+                            println!("Conn accepted for {}", addr);
+                            println!("Sending data");
+
+                            stream.write("hello world".as_ref()).unwrap();
+                        }
+                    }
+                }
+                CLIENT => {
+                    println!("Client");
+                    println!("event : {:#?}", event);
+                    // The server just shuts down the socket, let's just exit
+                    // from our event loop.
+                    let mut buf: Vec<u8> = Vec::with_capacity(1024);
+
+                    let size = sock.read(&mut buf).unwrap();
+                    let result = String::from_utf8(buf).unwrap();
+                    println!("Received: {}", result);
+                    println!("Size: {}", size);
+
+                    sock.write("hello world".as_ref()).unwrap();
+
+                    //return;
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
 }
