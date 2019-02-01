@@ -76,7 +76,7 @@ fn main() {
                             },
                             Err(err) => {
                                 println!("read err: {}", err);
-                                println!("read err: {}", err.kind());
+                                println!("read kind: {:#?}", err.kind());
                                 break;
                             }
                         }
