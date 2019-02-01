@@ -15,6 +15,8 @@ use self::RbtcFsm::Variant;
 use self::RbtcFsm::Variant::*;
 use self::RbtcFsm::*;
 
+use std::collections::HashMap;
+
 
 sm! {
 
@@ -41,8 +43,90 @@ sm! {
 
     }
 }
+#[derive(Eq, PartialEq, Hash)]
+enum State {
+    Init,
+    Connected,
+    End
+}
 
-struct TcpFsm {
+#[derive(Eq, PartialEq, Hash)]
+enum Trigger {
+    InitialStates,
+    ConnectParseAddrFailed,
+    ConnectSucceed,
+    ConnectFailed,
+    ConnectRetryFailed,
+    ReadSucceed,
+    ReadFailed,
+    ReadRetryFailed,
+    WriteSucceed,
+    WriteFailed,
+    WriteRetryFailed,
+}
+
+struct StateMachine {
+     states: HashMap<State, StateConfiguration>,
+}
+
+struct StateConfiguration {
+    triggers: Vec<TriggerConfiguration>,
+    entry_actions: Vec<fn() -> ()>,
+    exit_actions: Vec<fn() -> ()>,
+}
+
+struct TriggerConfiguration {
+    trigger: Trigger,
+    destination: State,
+}
+
+impl StateMachine {
+
+    fn new() -> StateMachine {
+        StateMachine {
+            states: HashMap::new(),
+        }
+    }
+
+    fn configure(&mut self, state: State) -> &StateConfiguration {
+        let state_configuration = StateConfiguration {
+            triggers: Vec::new(),
+            entry_actions: Vec::new(),
+            exit_actions: Vec::new(),
+        };
+        self.states.insert(state, state_configuration);
+        &state_configuration
+    }
+
+    fn fire(&mut self, trigger: Trigger) {
+        
+    }
+
+}
+
+impl StateConfiguration {
+
+    fn permit(&mut self, trigger: Trigger, destination: State) -> &Self {
+        let trigger_configuration = TriggerConfiguration {
+            trigger: trigger,
+            destination: destination,
+        };
+        self.triggers.push(trigger_configuration);
+        &self
+    }
+
+    fn on_entry(&mut self, f: fn() -> ()) -> &Self {
+        self.entry_actions.push(f);
+        &self
+    }
+
+    fn on_exit(&mut self, f: fn() -> ()) -> &Self {
+        self.exit_actions.push(f);
+        &self
+    }
+}
+
+struct TcpClient {
     id: u32,
     connect_retry: u32,
     getaddr_retry: u32,
@@ -50,30 +134,7 @@ struct TcpFsm {
     stream: Option<TcpStream>,
 }
 
-
-pub(crate) trait TcpFsmEvent {
-
-    fn run(&mut self);
-
-    // Init
-    fn on_init_by_none_event(&mut self, m: Machine<Init, NoneEvent>) -> Variant;
-    fn on_init_by_connect_failed(&mut self, m: Machine<Init, ConnectFailed>) -> Variant;
-    fn on_init_by_read_retry_failed(&mut self, m: Machine<Init, ReadRetryFailed>) -> Variant;
-    fn on_init_by_write_retry_failed(&mut self, m: Machine<Init, WriteRetryFailed>) -> Variant;
-
-    // Connect
-    fn on_connected_by_connect_succeed(&mut self, m: Machine<Connected, ConnectSucceed>) -> Variant;
-    fn on_connected_by_read_succeed(&mut self, m: Machine<Connected, ReadSucceed>) -> Variant;
-    fn on_connected_by_read_failed(&mut self, m: Machine<Connected, ReadFailed>) -> Variant;
-    fn on_connected_by_write_succeed(&mut self, m: Machine<Connected, WriteSucceed>) -> Variant;
-    fn on_connected_by_write_failed(&mut self, m: Machine<Connected, WriteFailed>) -> Variant;
-
-    // End
-    fn on_end_by_parse_addr_failed(&mut self, m: Machine<End, ConnectParseAddrFailed>);
-    fn on_end_by_connect_retry_failed(&mut self, m: Machine<End, ConnectRetryFailed>);
-}
-
-impl TcpFsmEvent for TcpFsm {
+impl TcpClient {
     
     fn run(&mut self) {
 
@@ -202,10 +263,6 @@ impl TcpFsmEvent for TcpFsm {
     // End
     fn on_end_by_parse_addr_failed(&mut self, m: Machine<End, ConnectParseAddrFailed>) {}
     fn on_end_by_connect_retry_failed(&mut self, m: Machine<End, ConnectRetryFailed>) {}
-}
-
-
-impl TcpFsm {
 
     pub fn new(id: u32) -> TcpFsm {
 
