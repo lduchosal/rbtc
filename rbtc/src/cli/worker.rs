@@ -146,10 +146,6 @@ impl Worker {
             addr: request.addr,
             result: sender,
         };
-<<<<<<< HEAD
-=======
-
->>>>>>> 562b12bc42a390dce77eba60dff884c14e90eaa4
         let spawn = tokio::spawn(setaddr);
         println!("Worker set_addr [spawn: {:#?}]", spawn);
         
@@ -167,13 +163,7 @@ impl Worker {
             }
         };
 
-<<<<<<< HEAD
-        drop(response);
-
-        println!("set_addr [result: {:#?}]", result);
-=======
         println!("Worker set_addr [result: {:#?}]", result);
->>>>>>> 562b12bc42a390dce77eba60dff884c14e90eaa4
         let sent = request.sender.send(result);
         println!("Worker set_addr [sent: {:#?}]", sent);
 

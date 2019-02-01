@@ -1,4 +1,5 @@
 use mio::*;
+use mio::unix::UnixReady;
 use mio::net::{TcpListener, TcpStream};
 use std::io::{Read, Write, Cursor};
 // Setup some tokens to allow us to identify which event is
@@ -10,65 +11,81 @@ fn main() {
 
     println!("main");
 
-    let addr = "127.0.0.1:13265".parse().unwrap();
+    let addr = "127.0.0.1:12345".parse().unwrap();
 
-    // Setup the server socket
-    let server = TcpListener::bind(&addr).unwrap();
-
-    // Create a poll instance
-    let poll = Poll::new().unwrap();
-
-    // Start listening for incoming connections
-    poll.register(&server, SERVER, Ready::all(),
-                PollOpt::edge()).unwrap();
-
-    // Setup the client socket
     let mut sock = TcpStream::connect(&addr).unwrap();
-
-    // Register the socket
-    poll.register(&sock, CLIENT, Ready::all(),
-                PollOpt::edge()).unwrap();
-
-    // Create storage for events
     let mut events = Events::with_capacity(1024);
 
+    let poll = Poll::new().unwrap();
+    poll.register(&sock, CLIENT, Ready::readable(), PollOpt::edge()).unwrap();
+
     loop {
+        println!("polling");
         poll.poll(&mut events, None).unwrap();
+        println!("events : {:#?}", events.len());
 
         for event in events.iter() {
+
+            println!("event");
+
+            let readiness = event.readiness();
+            println!("event : {:#?}", event);
+            println!("readiness : {:#?}", readiness);
+            println!("is_writable : {:#?}", readiness.is_writable());
+            println!("is_readable : {:#?}", readiness.is_readable());
+            println!("is_error : {:#?}", readiness.is_error());
+
+            let unix_ready = UnixReady::from(readiness);
+
+            println!("readiness : {:#?}", unix_ready);
+            println!("is_writable : {:#?}", unix_ready.is_writable());
+            println!("is_readable : {:#?}", unix_ready.is_readable());
+            println!("is_error : {:#?}", unix_ready.is_error());
+
+
             match event.token() {
-                SERVER => {
+                CLIENT => {
 
-                    println!("Server");
-                    // Accept and drop the socket immediately, this will close
-                    // the socket and notify the client of the EOF.
-                    let accept = server.accept();
-                    println!("event : {:#?}", event);
-                    match accept {
-                        Err(err) => println!("Error with accept"),
-                        Ok((mut stream, addr))  => {
-                            println!("Conn accepted for {}", addr);
-                            println!("Sending data");
+                    let error = sock.take_error();
+                    println!("error : {:#?}", error);
+                    match error {
+                        Ok(Some(err)) => {
+                            println!("Error occurred, sleeping 1s");
+                            std::thread::sleep_ms(1000);
+                            poll.deregister(&sock).unwrap();
 
-                            stream.write("hello world".as_ref()).unwrap();
+                            sock = TcpStream::connect(&addr).unwrap();
+                            poll.register(&sock, CLIENT, Ready::readable(), PollOpt::edge()).unwrap();
+                            continue;
+                        },
+                        _ => {},
+                    }
+
+                    println!("kind : {:#?}", event.kind());
+                    println!("token : {:#?}", event.token());
+
+
+                    loop {
+                        let mut buf: Vec<u8> = vec![0u8; 256];
+                        let read = sock.read(&mut buf);
+                        match read {
+                            Ok(size) => {
+                                let result = String::from_utf8(buf).unwrap();
+                                println!("read: {}", size);
+                                println!("result: {}", result);
+                            },
+                            Err(err) => {
+                                println!("read err: {}", err);
+                                println!("read err: {}", err.kind());
+                                break;
+                            }
                         }
                     }
-                }
-                CLIENT => {
-                    println!("Client");
-                    println!("event : {:#?}", event);
-                    // The server just shuts down the socket, let's just exit
-                    // from our event loop.
-                    let mut buf: Vec<u8> = Vec::with_capacity(1024);
 
-                    let size = sock.read(&mut buf).unwrap();
-                    let result = String::from_utf8(buf).unwrap();
-                    println!("Received: {}", result);
-                    println!("Size: {}", size);
 
-                    sock.write("hello world".as_ref()).unwrap();
+                    let writen = sock.write("hello world".as_ref()).unwrap();
+                    println!("writen: {}", writen);
 
-                    //return;
                 }
                 _ => unreachable!(),
             }
