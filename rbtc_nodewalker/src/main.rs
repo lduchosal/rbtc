@@ -9,7 +9,6 @@ use std::net::{SocketAddr, AddrParseError};
 use std::collections::HashMap;
 
 struct TcpClient {
-    token: mio::Token,
     machine: StateMachine,
     business: Business,
     addr: Option<SocketAddr>,
@@ -18,7 +17,7 @@ struct TcpClient {
 
 impl TcpClient {
     
-    fn new(id: Token) -> TcpClient {
+    fn new() -> TcpClient {
 
         trace!("new");
 
@@ -43,7 +42,6 @@ impl TcpClient {
         ;
 
         TcpClient {
-            token: id,
             machine: m,
             business: Business {},
             addr: None,
@@ -84,7 +82,7 @@ impl TcpClient {
                 poll.deregister(socket).unwrap();
 
                 let socket = TcpStream::connect(&addr).unwrap();
-                poll.register(&socket, self.token, mio::Ready::readable(), PollOpt::edge()).unwrap();
+                // poll.register(&socket, self.token, mio::Ready::readable(), PollOpt::edge()).unwrap();
                 self.socket = Some(socket);
 
                 return;
@@ -139,56 +137,87 @@ impl Business  {
     }
 }
 
+struct Engine {
+    clients: HashMap::<Token, TcpClient>,
+}
+
+impl Engine {
+
+    fn new() -> Engine {
+
+        let clients = HashMap::<Token, TcpClient>::new();
+
+        Engine {
+            clients: clients,
+        }
+    }
+
+    fn register(&self, client: TcpClient) {
+
+        let clients = &self.clients;
+        let token = Token(1);
+        clients.insert(token, client);
+
+    }
+    
+    fn run(&self, poll: &mio::Poll) {
+
+        let clients = &self.clients;
+        let mut events = Events::with_capacity(1024);
+        
+        client.connect("127.0.0.1:8333".to_string());
+
+        let socket = client.socket.as_ref().unwrap();
+        poll.register(socket, token, mio::Ready::readable(), PollOpt::edge()).unwrap();
+
+        loop {
+
+            println!("polling");
+
+            poll.poll(&mut events, None).unwrap();
+            println!("events : {:#?}", events.len());
+
+            for event in events.iter() {
+
+                println!("event");
+
+                let readiness = event.readiness();
+                println!("event : {:#?}", event);
+                println!("readiness : {:#?}", readiness);
+                println!("is_writable : {:#?}", readiness.is_writable());
+                println!("is_readable : {:#?}", readiness.is_readable());
+                println!("is_error : {:#?}", readiness.is_error());
+        
+                println!("kind : {:#?}", event.kind());
+                println!("token : {:#?}", event.token());
+
+                let token = event.token();
+                let client = clients.get_mut(&token);
+
+                if client.is_none() {
+                    continue;
+                }
+                let client = client.unwrap();
+
+                client.handle(&poll, event);
+
+            }
+        }
+    }
+
+}
+
 fn main() {
 
     println!("main");
 
+    let engine = Engine::new();
+    let tcpclient = TcpClient::new();
     let poll = Poll::new().unwrap();
-    let mut events = Events::with_capacity(1024);
 
-    let token = Token(1);
-    let mut tcpclient = TcpClient::new(token);
-    tcpclient.connect("127.0.0.1:8333".to_string());
+    engine.register(tcpclient);
+    engine.run(poll);
 
-    let socket = tcpclient.socket.as_ref().unwrap();
-    poll.register(socket, token, mio::Ready::readable(), PollOpt::edge()).unwrap();
-
-    let mut clients = HashMap::<Token, TcpClient>::new();
-    clients.insert(token, tcpclient);
-
-    loop {
-
-        println!("polling");
-
-        poll.poll(&mut events, None).unwrap();
-        println!("events : {:#?}", events.len());
-
-        for event in events.iter() {
-
-            println!("event");
-
-            let readiness = event.readiness();
-            println!("event : {:#?}", event);
-            println!("readiness : {:#?}", readiness);
-            println!("is_writable : {:#?}", readiness.is_writable());
-            println!("is_readable : {:#?}", readiness.is_readable());
-            println!("is_error : {:#?}", readiness.is_error());
-    
-            println!("kind : {:#?}", event.kind());
-            println!("token : {:#?}", event.token());
-
-            let token = event.token();
-            let client = clients.get_mut(&token);
-
-            if client.is_none() {
-                continue;
-            }
-            let client = client.unwrap();
-
-            client.handle(&poll, event);
-
-        }
-    }
 }
 
 
