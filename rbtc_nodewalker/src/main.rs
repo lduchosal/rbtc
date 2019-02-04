@@ -68,6 +68,8 @@ impl TcpClient {
         self.socket = Some(socket);
     }
 
+
+
     fn handle(&mut self, poll: &mio::Poll, event: mio::event::Event) {
 
         let mut socket = self.socket.as_ref().unwrap();
@@ -111,6 +113,26 @@ impl TcpClient {
         println!("writen: {}", writen);
 
     }
+
+    fn on_ready(&self, event: mio::event::Event) {
+        trace!("on_ready");
+
+    }
+
+    fn on_readable(&self, event: mio::event::Event) {
+        trace!("on_readable");
+
+    }
+
+    fn on_writable(&self, event: mio::event::Event) {
+        trace!("on_writable");
+
+    }
+
+    fn on_error(&self, event: mio::event::Event) {
+        trace!("on_error");
+
+    }
 }
 
 struct Business {
@@ -137,44 +159,52 @@ impl Business  {
     }
 }
 
-struct Engine {
+struct Engine<'P> {
+    poll: &'P mio::Poll,
     clients: HashMap::<Token, TcpClient>,
+    ids: atomic::Atomic<usize>,
 }
 
-impl Engine {
+impl<'P>  Engine<'P>  {
 
-    fn new() -> Engine {
+    fn new(poll: &'P mio::Poll) -> Engine<'P>  {
 
         let clients = HashMap::<Token, TcpClient>::new();
 
         Engine {
+            poll: poll,
             clients: clients,
+            ids: atomic::Atomic::new(1),
         }
     }
 
-    fn register(&self, client: TcpClient) {
+    fn next_id(&mut self) -> usize {
+        self.ids.fetch_add(1, atomic::Ordering::Relaxed)
+    }
 
-        let clients = &self.clients;
-        let token = Token(1);
-        clients.insert(token, client);
+    fn register(&mut self, mut client: TcpClient) {
 
+        let tokenid = self.next_id();
+        let token = Token(tokenid);
+
+        client.connect("127.0.0.1:8333".to_string());
+        if let Some(ref stream) = &client.socket {
+            self.poll.register(stream, token, mio::Ready::readable(), PollOpt::edge()).unwrap();
+        }
+        
+        self.clients.insert(token, client);
     }
     
-    fn run(&self, poll: &mio::Poll) {
+    fn run(&mut self) {
 
         let clients = &self.clients;
         let mut events = Events::with_capacity(1024);
         
-        client.connect("127.0.0.1:8333".to_string());
-
-        let socket = client.socket.as_ref().unwrap();
-        poll.register(socket, token, mio::Ready::readable(), PollOpt::edge()).unwrap();
-
         loop {
 
             println!("polling");
 
-            poll.poll(&mut events, None).unwrap();
+            self.poll.poll(&mut events, None).unwrap();
             println!("events : {:#?}", events.len());
 
             for event in events.iter() {
@@ -182,6 +212,8 @@ impl Engine {
                 println!("event");
 
                 let readiness = event.readiness();
+                let token = event.token();
+
                 println!("event : {:#?}", event);
                 println!("readiness : {:#?}", readiness);
                 println!("is_writable : {:#?}", readiness.is_writable());
@@ -191,15 +223,30 @@ impl Engine {
                 println!("kind : {:#?}", event.kind());
                 println!("token : {:#?}", event.token());
 
-                let token = event.token();
-                let client = clients.get_mut(&token);
 
+                let client = clients.get_mut(&token);
                 if client.is_none() {
                     continue;
                 }
                 let client = client.unwrap();
 
-                client.handle(&poll, event);
+
+                if readiness.is_error() {
+                    client.on_error(event);
+                }
+
+                if readiness.is_readable()
+                    || readiness.is_writable() {
+                    client.on_ready(event);
+                }
+
+                if readiness.is_readable() {
+                    client.on_readable(event);
+                }
+
+                if readiness.is_writable() {
+                    client.on_writable(event);
+                }
 
             }
         }
@@ -210,13 +257,13 @@ impl Engine {
 fn main() {
 
     println!("main");
-
-    let engine = Engine::new();
+    let poll = mio::Poll::new().expect("Unable to start mio Poll");
+    let mut engine = Engine::new(&poll);
     let tcpclient = TcpClient::new();
     let poll = Poll::new().unwrap();
 
     engine.register(tcpclient);
-    engine.run(poll);
+    engine.run();
 
 }
 
