@@ -18,6 +18,7 @@ futures = "0.1.25"
 tokio = "0.1.14"
 bytes = "0.4.11"
 mio = "0.6.16"
+atomic = "0.4.3"
 
 [dependencies.rusqlite]
 version = "0.16.0"

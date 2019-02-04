@@ -1,468 +1,160 @@
-extern crate sm;
 #[macro_use] extern crate log;
-
-use sm::NoneEvent;
-use sm::sm;
-use std::net::SocketAddr;
+extern crate atomic;
 
 use mio::*;
 use mio::net::TcpStream;
 use std::io::{Read, Write, Cursor};
-// Setup some tokens to allow us to identify which event is
-// for which socket.
 
-use self::RbtcFsm::Variant;
-use self::RbtcFsm::Variant::*;
-use self::RbtcFsm::*;
-
+use std::net::{SocketAddr, AddrParseError};
 use std::collections::HashMap;
 
-
-sm! {
-
-    RbtcFsm {
-
-        // Init
-        InitialStates { Init }
-        
-        // Connect
-        ConnectParseAddrFailed { Init => End }
-        ConnectSucceed { Init => Connected }
-        ConnectFailed { Init => Init }
-        ConnectRetryFailed { Init => End }
-
-        // Read
-        ReadSucceed { Connected => Connected }
-        ReadFailed { Connected => Connected }
-        ReadRetryFailed { Connected => Init }
-        
-        // Write
-        WriteSucceed { Connected => Connected }
-        WriteFailed { Connected => Connected }
-        WriteRetryFailed { Connected => Init }
-
-    }
-}
-#[derive(Eq, PartialEq, Hash)]
-enum State {
-    Init,
-    Connected,
-    End
-}
-
-#[derive(Eq, PartialEq, Hash)]
-enum Trigger {
-    InitialStates,
-    ConnectParseAddrFailed,
-    ConnectSucceed,
-    ConnectFailed,
-    ConnectRetryFailed,
-    ReadSucceed,
-    ReadFailed,
-    ReadRetryFailed,
-    WriteSucceed,
-    WriteFailed,
-    WriteRetryFailed,
-}
-
-struct StateMachine {
-     states: HashMap<State, StateConfiguration>,
-}
-
-struct StateConfiguration {
-    triggers: Vec<TriggerConfiguration>,
-    entry_actions: Vec<fn() -> ()>,
-    exit_actions: Vec<fn() -> ()>,
-}
-
-struct TriggerConfiguration {
-    trigger: Trigger,
-    destination: State,
-}
-
-impl StateMachine {
-
-    fn new() -> StateMachine {
-        StateMachine {
-            states: HashMap::new(),
-        }
-    }
-
-    fn configure(&mut self, state: State) -> &StateConfiguration {
-        let state_configuration = StateConfiguration {
-            triggers: Vec::new(),
-            entry_actions: Vec::new(),
-            exit_actions: Vec::new(),
-        };
-        self.states.insert(state, state_configuration);
-        &state_configuration
-    }
-
-    fn fire(&mut self, trigger: Trigger) {
-        
-    }
-
-}
-
-impl StateConfiguration {
-
-    fn permit(&mut self, trigger: Trigger, destination: State) -> &Self {
-        let trigger_configuration = TriggerConfiguration {
-            trigger: trigger,
-            destination: destination,
-        };
-        self.triggers.push(trigger_configuration);
-        &self
-    }
-
-    fn on_entry(&mut self, f: fn() -> ()) -> &Self {
-        self.entry_actions.push(f);
-        &self
-    }
-
-    fn on_exit(&mut self, f: fn() -> ()) -> &Self {
-        self.exit_actions.push(f);
-        &self
-    }
-}
-
 struct TcpClient {
-    id: u32,
-    connect_retry: u32,
-    getaddr_retry: u32,
+    token: mio::Token,
+    machine: StateMachine,
+    business: Business,
     addr: Option<SocketAddr>,
-    stream: Option<TcpStream>,
+    socket: Option<TcpStream>,
 }
 
 impl TcpClient {
     
-    fn run(&mut self) {
+    fn new(id: Token) -> TcpClient {
 
-        trace!("run");
+        trace!("new");
 
-        let mut iteration = 0;
-        let mut sm = Machine::new(Init).as_enum();
+        let mut m = StateMachine::new(State::Init);
+        m.configure(State::Init)
+            .permit(Trigger::ConnectFailed, State::Init)
+            .permit(Trigger::ConnectSucceed, State::Connected)
+            .permit(Trigger::ConnectParseAddrFailed, State::End)
+            .permit(Trigger::ConnectRetryFailed, State::End)
+        ;
+
+        m.configure(State::Connected)
+            .permit(Trigger::ReadSucceed, State::Connected)
+            .permit(Trigger::ReadFailed, State::Connected)
+            .permit(Trigger::ReadRetryFailed, State::End)
+        ;
+
+        m.configure(State::Connected)
+            .permit(Trigger::WriteSucceed, State::Connected)
+            .permit(Trigger::WriteFailed, State::Connected)
+            .permit(Trigger::WriteRetryFailed, State::End)
+        ;
+
+        TcpClient {
+            token: id,
+            machine: m,
+            business: Business {},
+            addr: None,
+            socket: None,
+        }
+    }
+
+    fn connect(&mut self, addr: String) {
+
+        trace!("connect");
+        debug!("connect [addr: {}]", addr);
+
+        let addr = self.business.do_parse_addr(addr);
+        if let Err(err) = addr {
+            debug!("connect failed [err: {}]", err);
+            self.machine.fire(Trigger::ConnectParseAddrFailed);
+            return;
+        }
+        self.addr = Some(addr.unwrap());
+
+        self.machine.fire(Trigger::ConnectSucceed);
+
+        let socket = TcpStream::connect(&self.addr.unwrap()).unwrap();
+        self.socket = Some(socket);
+    }
+
+    fn handle(&mut self, poll: &mio::Poll, event: mio::event::Event) {
+
+        let mut socket = self.socket.as_ref().unwrap();
+        let addr = self.addr.unwrap();
+
+        let error = socket.take_error();
+        println!("error : {:#?}", error);
+        match error {
+            Ok(Some(err)) => {
+                println!("Error occurred, sleeping 1s");
+                std::thread::sleep_ms(1000);
+                poll.deregister(socket).unwrap();
+
+                let socket = TcpStream::connect(&addr).unwrap();
+                poll.register(&socket, self.token, mio::Ready::readable(), PollOpt::edge()).unwrap();
+                self.socket = Some(socket);
+
+                return;
+            },
+            _ => {},
+        }
 
         loop {
-
-            let sleep = std::time::Duration::from_millis(500);
-            std::thread::sleep(sleep);
-
-            debug!("run [sm: {:?}]", sm);
-            debug!("run [i: {:?}]", iteration);
-            debug!("run [sleep: {:?}]", sleep);
-
-            iteration = iteration + 1;
-
-            sm = match sm {
-
-                // Init
-                InitialInit(m) => self.on_init_by_none_event(m),
-                InitByConnectFailed(m) => self.on_init_by_connect_failed(m),
-
-                //EndByParseAddrFailed(m) => { self.on_end_by_parse_addr_failed(m); break; },
-
-            };
-        }
-        debug!("thread loop ended");
-    }
-
-    fn on_init_by_none_event(&mut self, m: Machine<Init, NoneEvent>) -> Variant {
-        trace!("on_init_by_none_event");
-        match self.init_connect_retry() {
-            InitConnectResult::Succeed => m.transition(ConnectSucceed).as_enum(),
-            InitConnectResult::ConnectFailed => m.transition(ConnectFailed).as_enum(),
-            InitConnectResult::ParseAddrFailed => m.transition(ConnectParseAddrFailed).as_enum(),
-            InitConnectResult::TooManyRetry => m.transition(ConnectRetryFailed).as_enum(),
-        }
-    }
-
-    
-    fn on_init_by_connect_failed(&mut self, m: Machine<Init, ConnectFailed>) -> Variant{
-        trace!("on_init_by_connect_failed");
-        match self.init_connect_retry() {
-            InitConnectResult::Succeed => m.transition(ConnectSucceed).as_enum(),
-            InitConnectResult::ConnectFailed => m.transition(ConnectFailed).as_enum(),
-            InitConnectResult::ParseAddrFailed => m.transition(ConnectParseAddrFailed).as_enum(),
-            InitConnectResult::TooManyRetry => m.transition(ConnectRetryFailed).as_enum(),
-        }
-    }
-
-    fn on_init_by_read_retry_failed(&mut self, m: Machine<Init, ReadRetryFailed>) -> Variant {
-        trace!("on_init_by_read_retry_failed");
-        match self.init_connect_retry() {
-            InitConnectResult::Succeed => m.transition(ConnectSucceed).as_enum(),
-            InitConnectResult::ConnectFailed => m.transition(ConnectFailed).as_enum(),
-            InitConnectResult::ParseAddrFailed => m.transition(ConnectParseAddrFailed).as_enum(),
-            InitConnectResult::TooManyRetry => m.transition(ConnectRetryFailed).as_enum(),
-        }
-
-    }
-    
-    fn on_init_by_write_retry_failed(&mut self, m: Machine<Init, WriteRetryFailed>) -> Variant {
-        trace!("on_init_by_none_event");
-        match self.init_connect_retry() {
-            InitConnectResult::Succeed => m.transition(ConnectSucceed).as_enum(),
-            InitConnectResult::ConnectFailed => m.transition(ConnectFailed).as_enum(),
-            InitConnectResult::ParseAddrFailed => m.transition(ConnectParseAddrFailed).as_enum(),
-            InitConnectResult::TooManyRetry => m.transition(ConnectRetryFailed).as_enum(),
-        }
-    }
-    
-
-    // Connected
-    fn on_connected_by_connect_succeed(&mut self, m: Machine<Connected, ConnectSucceed>) -> Variant {
-        trace!("on_connected_by_connect_succeed");
-
-        match self.read_retry() {
-            ReadRetryResult::Succeed => m.transition(ReadSucceed).as_enum(),
-            ReadRetryResult::Failed => m.transition(ReadFailed).as_enum(),
-            ReadRetryResult::TooManyRetry => m.transition(ReadRetryFailed).as_enum(),
-        }
-    }
-
-    fn on_connected_by_read_succeed(&mut self, m: Machine<Connected, ReadSucceed>) -> Variant {
-        trace!("on_connected_by_read_succeed");
-        match self.write_retry() {
-            WriteRetryResult::Succeed => m.transition(WriteSucceed).as_enum(),
-            WriteRetryResult::Failed => m.transition(WriteFailed).as_enum(),
-            WriteRetryResult::TooManyRetry => m.transition(WriteRetryFailed).as_enum(),
-        }
-    }
-
-    fn on_connected_by_read_failed(&mut self, m: Machine<Connected, ReadFailed>) -> Variant {
-        trace!("on_connected_by_read_failed");
-
-        match self.read_retry() {
-            ReadRetryResult::Succeed => m.transition(ReadSucceed).as_enum(),
-            ReadRetryResult::Failed => m.transition(ReadFailed).as_enum(),
-            ReadRetryResult::TooManyRetry => m.transition(ReadRetryFailed).as_enum(),
-        }
-    }
-
-    fn on_connected_by_write_succeed(&mut self, m: Machine<Connected, WriteSucceed>) -> Variant {
-        trace!("on_connected_by_write_succeed");
-        
-        match self.read_retry() {
-            ReadRetryResult::Succeed => m.transition(ReadSucceed).as_enum(),
-            ReadRetryResult::Failed => m.transition(ReadFailed).as_enum(),
-            ReadRetryResult::TooManyRetry => m.transition(ReadRetryFailed).as_enum(),
-        }
-    }
-
-    fn on_connected_by_write_failed(&mut self, m: Machine<Connected, WriteFailed>) -> Variant {
-        trace!("on_connected_by_write_failed");
-
-        match self.write_retry() {
-            WriteRetryResult::Succeed => m.transition(ReadSucceed).as_enum(),
-            WriteRetryResult::Failed => m.transition(ReadFailed).as_enum(),
-            WriteRetryResult::TooManyRetry => m.transition(ReadRetryFailed).as_enum(),
-        }
-    }
-
-    // End
-    fn on_end_by_parse_addr_failed(&mut self, m: Machine<End, ConnectParseAddrFailed>) {}
-    fn on_end_by_connect_retry_failed(&mut self, m: Machine<End, ConnectRetryFailed>) {}
-
-    pub fn new(id: u32) -> TcpFsm {
-
-        TcpFsm {
-            id: id,
-            connect_retry: 0,
-            getaddr_retry: 0,
-            addr: None,
-            stream: None
-        }
-    }
-
-    pub(crate) fn init_connect_retry(&mut self) -> InitConnectResult  {
-
-        trace!("init_connect_retry");
-
-        match self.init() {
-            InitResult::ParseAddrFailed => InitConnectResult::ParseAddrFailed,
-            InitResult::Succeed => {
-                match self.connect_retry() {
-                    ConnectRetryResult::ConnectFailed => InitConnectResult::ConnectFailed,
-                    ConnectRetryResult::TooManyRetry => InitConnectResult::TooManyRetry,
-                    ConnectRetryResult::Succeed => InitConnectResult::Succeed
+            let mut buf: Vec<u8> = vec![0u8; 256];
+            let read = socket.read(&mut buf);
+            match read {
+                Ok(size) => {
+                    let result = String::from_utf8(buf).unwrap();
+                    println!("read: {}", size);
+                    println!("result: {}", result);
+                },
+                Err(err) => {
+                    println!("read err: {}", err);
+                    println!("read kind: {:#?}", err.kind());
+                    break;
                 }
             }
         }
+
+        let writen = socket.write("hello world".as_ref()).unwrap();
+        println!("writen: {}", writen);
+
     }
+}
 
-    pub(crate) fn read_retry(&mut self) -> ReadRetryResult  {
-        trace!("read_retry");
-        ReadRetryResult::Succeed
-    }
+struct Business {
+}
 
-    pub(crate) fn write_retry(&mut self) -> WriteRetryResult  {
-        trace!("write_retry");
-        WriteRetryResult::Succeed
-    }
+impl Business  {
 
-    pub(crate) fn connect_retry(&mut self) -> ConnectRetryResult {
+    fn do_parse_addr(&self, addr: String) -> Result<SocketAddr, AddrParseError> {
 
-        trace!("connect_retry");
+        trace!("do_parse_addr");
+        debug!("do_parse_addr [addr: {}]", addr);
 
-        let retry  = self.connect_retry;
-        let maxretry = 1;
+        let mut node_ip_port = addr.clone();
 
-        debug!("connect_retry [retry: {}]", retry);
-        debug!("connect_retry [maxretry: {}]", maxretry);
-
-        self.connect_retry = self.connect_retry + 1;
-        if retry >= maxretry {
-            return ConnectRetryResult::TooManyRetry;
-        }
-
-        match self.connect() {
-            ConnectResult::Succeed => ConnectRetryResult::Succeed,
-            ConnectResult::ConnectFailed => ConnectRetryResult::ConnectFailed
-        }
-    }
-
-    pub(crate) fn init(&mut self) -> InitResult {
-
-        trace!("init");
-        debug!("init [node_ip_port: {}]", self.node_ip_port);
-
-        let mut node_ip_port = self.node_ip_port.clone();
-
-        if let Ok(addr) = node_ip_port.parse() {
-            self.addr = Some(addr);
-            return InitResult::Succeed;
+        if let Ok(addr) = addr.parse() {
+            return Ok(addr);
         }
         
         node_ip_port.push_str(":8333");
-        match node_ip_port.parse() {
-            Ok(addr) => {
-                self.addr = Some(addr);
-                InitResult::Succeed
-            },
-            Err(err) => {
-                warn!("init [err: {}]", err);
-                warn!("init [node_ip_port: {}]", node_ip_port);
-                InitResult::ParseAddrFailed
-            }
-        }
+        node_ip_port.parse()
     }
 
-    pub(crate) fn connect(&mut self) -> ConnectResult {
-
-        trace!("connect");
-
-        let addr = self.addr.unwrap();
-
-        let connect_timeout = std::time::Duration::from_secs(3);
-        let read_timeout = std::time::Duration::from_secs(3);
-        let write_timeout = std::time::Duration::from_secs(3);
-
-        debug!("connect [connect_timeout: {:?}]", connect_timeout);
-        debug!("connect [read_timeout: {:?}]", read_timeout);
-        debug!("connect [write_timeout: {:?}]", write_timeout);
-
-        match TcpStream::connect_timeout(&addr, connect_timeout) {
-            Err(err) => {
-                debug!("connect failed [err: {}]", err);
-                self.stream = None;
-                ConnectResult::ConnectFailed
-            },
-            Ok(stream) => {
-                if let Err(err) = stream.set_read_timeout(Option::Some(read_timeout)) {
-                    warn!("connect set_read_timeout [err: {}]", err);
-                };
-                if let Err(err) = stream.set_write_timeout(Option::Some(write_timeout)) {
-                    warn!("connect set_write_timeout [err: {}]", err);
-                };
-                self.stream = Some(stream);
-                ConnectResult::Succeed
-            }
-        }
+    fn do_connect(&self, addr: SocketAddr, conn: TcpStream) {
     }
-
-
-    fn send(&mut self, messages: Vec<Message>) -> SendResult {
-
-        trace!("send");
-
-        let mut stream = self.stream.as_ref().unwrap();
-        let mut request : Vec<u8> = Vec::new();
-
-        if let Err(err) = messages.encode(&mut request) {
-            debug!("send messages.encode [err: {:?}]", err);
-            return SendResult::EncodeFailed;
-        }
-
-        if let Err(err) = stream.write(&request) {
-            debug!("send stream.write [err: {:?}]", err);
-            return SendResult::WriteFailed;
-        }
-        
-        SendResult::Succeed
-    }
-
-    fn receive(&mut self) -> ReceiveResult {
-
-        trace!("receive");
-
-        let mut stream = self.stream.as_ref().unwrap();
-        let response = &mut self.response;
-        
-        let mut buffer = [0u8; 8192];
-        let mut _read : usize = 0;
-
-        debug!("receive [buffer: {}]", buffer.len());
-
-        loop {
-
-            match stream.read(&mut buffer) {
-                Ok(bytes) => _read = bytes,
-                Err(err) => {
-                    debug!("receive stream.read [err: {:?}]", err);
-                    return ReceiveResult::ReadFailed;
-                }
-            };
-
-            debug!("receive [read: {}]", _read);
-            if _read == 0 {
-                return ReceiveResult::ReadEmpty;
-            }
-
-            let mut temp = buffer.to_vec();
-            temp.truncate(_read);
-            response.append(&mut temp);
-
-            if _read == buffer.len() {
-                continue;
-            }
-            // else if read < buffer.len() 
-            return ReceiveResult::ReadSome;
-        }
-
-    }
-
 }
-
-
-const CLIENT: Token = Token(1);
 
 fn main() {
 
     println!("main");
 
-    let tcpfsm = TcpFsm::new(0);
-    tcpfsm.run();
-    
-
-    tcpfsm.connect("127.0.0.1:12345".to_string());
-
-    let mut sock = TcpStream::connect(&addr).unwrap();
+    let poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(1024);
 
-    let poll = Poll::new().unwrap();
-    poll.register(&sock, CLIENT, mio::Ready::readable(), PollOpt::edge()).unwrap();
+    let token = Token(1);
+    let mut tcpclient = TcpClient::new(token);
+    tcpclient.connect("127.0.0.1:8333".to_string());
 
+    let socket = tcpclient.socket.as_ref().unwrap();
+    poll.register(socket, token, mio::Ready::readable(), PollOpt::edge()).unwrap();
+
+    let mut clients = HashMap::<Token, TcpClient>::new();
+    clients.insert(token, tcpclient);
 
     loop {
 
@@ -481,136 +173,203 @@ fn main() {
             println!("is_writable : {:#?}", readiness.is_writable());
             println!("is_readable : {:#?}", readiness.is_readable());
             println!("is_error : {:#?}", readiness.is_error());
+    
+            println!("kind : {:#?}", event.kind());
+            println!("token : {:#?}", event.token());
 
-            match event.token() {
-                CLIENT => {
+            let token = event.token();
+            let client = clients.get_mut(&token);
 
-                    let error = sock.take_error();
-                    println!("error : {:#?}", error);
-                    match error {
-                        Ok(Some(err)) => {
-                            println!("Error occurred, sleeping 1s");
-                            std::thread::sleep_ms(1000);
-                            poll.deregister(&sock).unwrap();
-
-                            sock = TcpStream::connect(&addr).unwrap();
-                            poll.register(&sock, CLIENT, mio::Ready::readable(), PollOpt::edge()).unwrap();
-                            continue;
-                        },
-                        _ => {},
-                    }
-
-                    println!("kind : {:#?}", event.kind());
-                    println!("token : {:#?}", event.token());
-
-
-                    loop {
-                        let mut buf: Vec<u8> = vec![0u8; 256];
-                        let read = sock.read(&mut buf);
-                        match read {
-                            Ok(size) => {
-                                let result = String::from_utf8(buf).unwrap();
-                                println!("read: {}", size);
-                                println!("result: {}", result);
-                            },
-                            Err(err) => {
-                                println!("read err: {}", err);
-                                println!("read kind: {:#?}", err.kind());
-                                break;
-                            }
-                        }
-                    }
-
-
-                    let writen = sock.write("hello world".as_ref()).unwrap();
-                    println!("writen: {}", writen);
-
-                }
-                _ => unreachable!(),
+            if client.is_none() {
+                continue;
             }
+            let client = client.unwrap();
+
+            client.handle(&poll, event);
+
         }
     }
 }
 
 
 
-#[derive(Debug, Clone)]
-pub enum EndResult {
-    ParseAddrFailed,
-    RetryFailed,
-    SendVersionFailed,
-    ReceiveVersionFailed,
-    ReceiveVerackFailed,
-    SendVerackFailed,
-    SendGetAddrRetryFailed,
-    ParseAddr,
+#[derive(Eq, PartialEq, Hash, Clone)]
+enum State {
+    Init,
+    Connected,
+    End
 }
 
-pub enum ConnectResult {
-    Succeed,
+#[derive(Eq, PartialEq, Hash, Clone)]
+enum Trigger {
+    ConnectParseAddrFailed,
+    ConnectSucceed,
     ConnectFailed,
-}
-
-pub enum InitResult {
-    Succeed,
-    ParseAddrFailed,
-}
-
-pub enum InitConnectResult {
-    Succeed,
-    ParseAddrFailed,
-    ConnectFailed,
-    TooManyRetry,
-}
-
-pub enum ReadRetryResult {
-    Succeed,
-    Failed,
-    TooManyRetry,
-}
-
-pub enum WriteRetryResult {
-    Succeed,
-    Failed,
-    TooManyRetry,
-}
-
-pub enum SendResult {
-    Succeed,
-    EncodeFailed,
-    WriteFailed,
-}
-
-pub enum SendMessageResult {
-    Succeed,
-    Failed,
-}
-
-pub enum ConnectRetryResult {
-    Succeed,
-    ConnectFailed,
-    TooManyRetry,
-}
-
-pub enum ReceiveResult {
+    ConnectRetryFailed,
+    ReadSucceed,
     ReadFailed,
-    ReadEmpty,
-    ReadSome,
+    ReadRetryFailed,
+    WriteSucceed,
+    WriteFailed,
+    WriteRetryFailed,
 }
 
-pub enum DecodeResult {
-    NeedMoreData,
-    DecodeFailed,
-    Succeed
+struct StateMachine {
+    state: State,
+    states: HashMap<State, StateConfigurationId>,
+    configurations: HashMap<StateConfigurationId, StateConfiguration>,
+    ids: atomic::Atomic<u32>,
 }
 
-pub enum ReceiveMessageResult {
-    Failed,
-    Succeed
+struct StateConfiguration {
+    triggers: HashMap<Trigger, TriggerConfiguration>,
+    entry_actions: Vec<fn() -> ()>,
+    exit_actions: Vec<fn() -> ()>,
 }
 
-pub enum SendGetAddrRetryResult {
-    TooManyRetry,
-    Succeed,
-    Failed
+struct StateConfigurationOperation<'M> {
+    id: StateConfigurationId,
+    machine: &'M mut StateMachine,
+}
+
+struct TriggerConfiguration {
+    trigger: Trigger,
+    destination: State,
+}
+
+type TriggerConfigurationId = u32;
+type StateConfigurationId = u32;
+
+impl StateMachine {
+
+    fn new(initial_state: State) -> StateMachine {
+        StateMachine {
+            state: initial_state,
+            states: HashMap::new(),
+            configurations: HashMap::new(),
+            ids: atomic::Atomic::new(0),
+        }
+    }
+
+    fn next_id(&mut self) -> u32 {
+        self.ids.fetch_add(1, atomic::Ordering::Relaxed)
+    }
+
+    fn next_state_configuration_id(&mut self) -> StateConfigurationId {
+        self.next_id() as StateConfigurationId
+    }
+
+    fn next_trigger_configuration_id(&mut self) -> TriggerConfigurationId {
+        self.next_id() as TriggerConfigurationId
+    }
+
+    fn configure(&mut self, state: State) -> StateConfigurationOperation {
+
+        let id = self.next_state_configuration_id();
+        let configuration = StateConfiguration {
+            triggers: HashMap::new(),
+            entry_actions: Vec::new(),
+            exit_actions: Vec::new(),
+        };
+
+        self.states.insert(state, id);
+        self.configurations.insert(id, configuration);
+
+        StateConfigurationOperation {
+            id: id,
+            machine: self,
+        }
+    }
+
+    fn fire(&mut self, trigger: Trigger) {
+
+        // csid : current state configurationid
+        let current_state = &self.state;
+        let csid = self.states.get(current_state);
+        if csid.is_none() {
+            return;
+        }
+        let csid = csid.unwrap();
+
+        // csc : current state configuration
+        let csc = self.configurations.get(csid);
+        if csc.is_none() {
+            return;
+        }
+        let csc = csc.unwrap();
+        
+        // cstc : current state trigger configuration
+        let cstc = csc.triggers.get(&trigger);
+        if cstc.is_none() {
+            return;
+        }
+        let cstc = cstc.unwrap();
+
+        // nsid : next state id
+        let next_state = cstc.destination.clone();
+        let nsid = self.states.get(&next_state);
+        if nsid.is_none() {
+            return;
+        }
+        let nsid = nsid.unwrap();
+
+        // nsc : next state configuration
+        let nsc = self.configurations.get(nsid);
+        if nsc.is_none() {
+            return;
+        }
+        let nsc = nsc.unwrap();
+
+        for on_exit in csc.exit_actions.iter() {
+            on_exit();
+        }
+
+        for on_entry in nsc.entry_actions.iter() {
+            on_entry();
+        }
+        self.state = next_state;
+    }
+}
+
+impl<'M> StateConfigurationOperation<'M> {
+
+    fn permit(self, trigger: Trigger, destination: State) -> Self {
+        let trigger_configuration = TriggerConfiguration {
+            trigger: trigger.clone(),
+            destination: destination,
+        };
+
+        let config = self.machine.configurations.get_mut(&self.id);
+        if config.is_none() {
+            return self;
+        }
+        let config = config.unwrap();
+
+        config.triggers.insert(trigger, trigger_configuration);
+        self
+    }
+
+    fn on_entry(self, f: fn() -> ()) -> Self {
+
+        let config = self.machine.configurations.get_mut(&self.id);
+        if config.is_none() {
+            return self;
+        }
+        let config = config.unwrap();
+
+        config.entry_actions.push(f);
+        self
+    }
+
+    fn on_exit(self, f: fn() -> ()) -> Self {
+
+        let config = self.machine.configurations.get_mut(&self.id);
+        if config.is_none() {
+            return self;
+        }
+        let config = config.unwrap();
+
+        config.exit_actions.push(f);
+        self
+    }
 }
