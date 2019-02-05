@@ -23,6 +23,8 @@ impl TcpClient {
 
         let mut m = StateMachine::new(State::Init);
         m.configure(State::Init)
+            .on_entry(|| println!("-> Init"))
+            .on_exit(|| println!("Init ->"))
             .permit(Trigger::ConnectFailed, State::Init)
             .permit(Trigger::ConnectSucceed, State::Connected)
             .permit(Trigger::ConnectParseAddrFailed, State::End)
@@ -30,15 +32,19 @@ impl TcpClient {
         ;
 
         m.configure(State::Connected)
+            .on_entry(|| println!("-> Connected"))
+            .on_exit(|| println!("Connected ->"))
             .permit(Trigger::ReadSucceed, State::Connected)
             .permit(Trigger::ReadFailed, State::Connected)
             .permit(Trigger::ReadRetryFailed, State::End)
-        ;
-
-        m.configure(State::Connected)
             .permit(Trigger::WriteSucceed, State::Connected)
             .permit(Trigger::WriteFailed, State::Connected)
             .permit(Trigger::WriteRetryFailed, State::End)
+        ;
+
+        m.configure(State::End)
+            .on_entry(|| println!("-> End"))
+            .on_exit(|| println!("End ->"))
         ;
 
         TcpClient {
@@ -67,8 +73,6 @@ impl TcpClient {
         let socket = TcpStream::connect(&self.addr.unwrap()).unwrap();
         self.socket = Some(socket);
     }
-
-
 
     fn handle(&mut self, poll: &mio::Poll, event: mio::event::Event) {
 
@@ -132,6 +136,29 @@ impl TcpClient {
     fn on_error(&self, event: mio::event::Event) {
         trace!("on_error");
 
+        let mut socket = self.socket.as_ref().unwrap();
+        let addr = self.addr.unwrap();
+
+        let error = socket.take_error();
+        println!("error : {:#?}", error);
+        match error {
+            Ok(Some(err)) => {
+                println!("Error occurred, sleeping 1s");
+                std::thread::sleep_ms(1000);
+                self.poll.deregister(socket).unwrap();
+
+                let socket = TcpStream::connect(&addr).unwrap();
+                // poll.register(&socket, self.token, mio::Ready::readable(), PollOpt::edge()).unwrap();
+                self.socket = Some(socket);
+
+                return;
+            },
+            _ => {},
+        }
+    }
+
+    fn set_poll_register(&mut self, poll_register: fn(client: &Self)) {
+        self.poll_register = poll_register;
     }
 }
 
@@ -184,20 +211,24 @@ impl<'P>  Engine<'P>  {
 
     fn register(&mut self, mut client: TcpClient) {
 
+        trace!("register");
         let tokenid = self.next_id();
         let token = Token(tokenid);
 
-        client.connect("127.0.0.1:8333".to_string());
-        if let Some(ref stream) = &client.socket {
-            self.poll.register(stream, token, mio::Ready::readable(), PollOpt::edge()).unwrap();
-        }
-        
+        //client.connect("127.0.0.1:8333".to_string());
+        client.poll = self.poll.clone();
         self.clients.insert(token, client);
     }
     
+    fn poll_register(&mut self, client: &TcpClient, token: Token) {
+        if let Some(ref stream) = client.socket {
+            self.poll.register(stream, token, mio::Ready::readable(), PollOpt::edge()).unwrap();
+        }
+    }
+
     fn run(&mut self) {
 
-        let clients = &self.clients;
+        trace!("run");
         let mut events = Events::with_capacity(1024);
         
         loop {
@@ -223,8 +254,7 @@ impl<'P>  Engine<'P>  {
                 println!("kind : {:#?}", event.kind());
                 println!("token : {:#?}", event.token());
 
-
-                let client = clients.get_mut(&token);
+                let client = self.clients.get_mut(&token);
                 if client.is_none() {
                     continue;
                 }
@@ -247,11 +277,9 @@ impl<'P>  Engine<'P>  {
                 if readiness.is_writable() {
                     client.on_writable(event);
                 }
-
             }
         }
     }
-
 }
 
 fn main() {
@@ -260,14 +288,11 @@ fn main() {
     let poll = mio::Poll::new().expect("Unable to start mio Poll");
     let mut engine = Engine::new(&poll);
     let tcpclient = TcpClient::new();
-    let poll = Poll::new().unwrap();
 
     engine.register(tcpclient);
     engine.run();
 
 }
-
-
 
 #[derive(Eq, PartialEq, Hash, Clone)]
 enum State {
